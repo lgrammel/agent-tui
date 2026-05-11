@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "weather": "bun run index.ts --agent weather"
+    "weather": "bun --env-file=.env run index.ts --agent weather"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.63",
     "@lgrammel/agent-tui": "workspace:*",
     "ai": "^7.0.0-canary.130",
     "zod": "^4"

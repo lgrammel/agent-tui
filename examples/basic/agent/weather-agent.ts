@@ -1,42 +1,20 @@
-import type { AgentTUIAgent, AgentTUIStreamPart } from "@lgrammel/agent-tui";
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
+import type { AgentTUIAgent } from "@lgrammel/agent-tui";
+import { weatherTool } from "../tool/weather-tool";
 
 export const weatherAgent: AgentTUIAgent = {
-  async stream({ prompt }) {
-    return {
-      fullStream: streamWeatherResponse(prompt),
-    };
+  stream({ messages }) {
+    return streamText({
+      model: openai("gpt-4.1-mini"),
+      system:
+        "You are a concise weather assistant. Use the weather tool when the user asks about weather, then answer in markdown.",
+      messages,
+      tools: {
+        weather: weatherTool,
+      },
+    });
   },
 };
-
-async function* streamWeatherResponse(prompt: string): AsyncIterable<AgentTUIStreamPart> {
-  const city = extractCity(prompt);
-  const weather = getWeather(city);
-
-  const response = [
-    "# Weather Report\n\n",
-    `- **City:** ${weather.city}\n`,
-    `- **Temperature:** ${weather.temperature}°F\n`,
-    `- **Conditions:** ${weather.weather}\n\n`,
-    "> This local demo agent streams markdown without calling an external model.\n",
-  ];
-
-  for (const text of response) {
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    yield { type: "text-delta", text };
-  }
-}
-
-function extractCity(prompt: string) {
-  const match = /(?:in|for)\s+([a-z\s]+)$/i.exec(prompt.trim());
-
-  return match?.[1]?.trim() || "San Francisco";
-}
-
-function getWeather(city: string) {
-  const weatherOptions = ["sunny", "cloudy", "rainy", "snowy", "windy"];
-  const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
-
-  return { city, temperature: 72, weather };
-}
 
 export default weatherAgent;

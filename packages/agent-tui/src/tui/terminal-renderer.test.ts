@@ -51,6 +51,19 @@ describe("TerminalRenderer", () => {
     expect(input.rawModes).toEqual([true, false]);
   });
 
+  it("renders stream errors into the body box", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(createErrorStream(new Error("Bad API key")) as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    expect(output.text()).toContain("Error: Bad API key");
+  });
+
   it("keeps the terminal session open between turns", async () => {
     const input = createInput();
     const output = createOutput();
@@ -122,6 +135,14 @@ function createStream(chunks: string[]) {
       for (const text of chunks) {
         yield { type: "text-delta", text };
       }
+    })(),
+  };
+}
+
+function createErrorStream(error: unknown) {
+  return {
+    fullStream: (async function* () {
+      yield { type: "error", error };
     })(),
   };
 }

@@ -1,12 +1,7 @@
 import { TerminalRenderer } from "./tui/terminal-renderer";
+import type { TextStreamPart, ToolSet } from "ai";
 
-export type AgentTUIStreamPart =
-  | { type: "text-delta"; text: string }
-  | { type: "reasoning-start" }
-  | { type: "reasoning-delta"; text: string }
-  | { type: "reasoning-end" }
-  | { type: "tool-call"; [key: string]: unknown }
-  | { type: "tool-result"; [key: string]: unknown };
+export type AgentTUIStreamPart = TextStreamPart<ToolSet>;
 
 export type AgentTUIStreamResult = {
   fullStream: AsyncIterable<AgentTUIStreamPart>;

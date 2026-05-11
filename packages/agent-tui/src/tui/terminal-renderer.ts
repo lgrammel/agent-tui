@@ -145,6 +145,12 @@ export class TerminalRenderer {
           case "tool-result":
             this.#append(`\n\nTool result: ${JSON.stringify(part)}\n\n`);
             break;
+          case "tool-error":
+            this.#append(`\n\nTool error: ${formatStreamError(part.error)}\n\n`);
+            break;
+          case "error":
+            this.#append(`\n\nError: ${formatStreamError(part.error)}\n\n`);
+            break;
         }
       }
     } finally {
@@ -325,6 +331,18 @@ export class TerminalRenderer {
 
 function interruptedError() {
   return new Error("Interrupted");
+}
+
+function formatStreamError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return JSON.stringify(error);
 }
 
 export function parseKey(chunk: Buffer): TerminalKey {

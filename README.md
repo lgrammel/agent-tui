@@ -9,7 +9,7 @@ This repo is a Bun monorepo with the package in `packages/agent-tui` and a basic
 
 1. Install [Bun](https://bun.com/)
 2. Run `bun i`
-3. Add a [Vercel AI Gateway API](https://vercel.com/docs/ai-gateway) key to `.env`
+3. Copy `examples/basic/.env.example` to `examples/basic/.env` and add an OpenAI API key
 
 ## Example
 
