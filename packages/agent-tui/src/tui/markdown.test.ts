@@ -3,9 +3,9 @@ import { renderMarkdown } from "./markdown";
 
 describe("renderMarkdown", () => {
   it("renders common markdown blocks as terminal text", () => {
-    expect(renderMarkdown("# Title\n## Section\n### Detail\n- item\n* other\n+ extra\n> quote")).toBe(
-      "█ Title\n■ Section\n▶ Detail\n• item\n• other\n• extra\n│ quote",
-    );
+    expect(
+      renderMarkdown("# Title\n## Section\n### Detail\n- item\n* other\n+ extra\n> quote"),
+    ).toBe("█ Title\n■ Section\n▶ Detail\n• item\n• other\n• extra\n│ quote");
   });
 
   it("renders inline markdown styles as ANSI text", () => {
