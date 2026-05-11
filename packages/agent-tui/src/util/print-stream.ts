@@ -1,7 +1,7 @@
 import { type StreamTextResult } from "ai";
 
 export async function printStream(
-  result: StreamTextResult<any, any>,
+  result: StreamTextResult<any, any, any>,
   options?: {
     includeReasoning?: boolean;
   },

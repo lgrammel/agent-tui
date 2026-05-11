@@ -17,4 +17,4 @@ const agent = (await import(agentPath)).default as Agent<ToolSet, unknown, unkno
 
 const agentTUI = new AgentTUI(agent);
 
-await agentTUI.run({ prompt: positionals[2]! });
+await agentTUI.run({ prompt: positionals[2] });

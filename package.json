@@ -11,11 +11,13 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",
+    "test": "vitest run",
     "weather": "bun --cwd examples/basic run weather"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "oxfmt": "^0.48.0",
-    "oxlint": "^1.63.0"
+    "oxlint": "^1.63.0",
+    "vitest": "^4.1.5"
   }
 }
