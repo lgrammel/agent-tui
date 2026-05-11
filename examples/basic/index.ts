@@ -1,7 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { AgentTUI } from "@lgrammel/agent-tui";
-import type { AgentTUIAgent } from "@lgrammel/agent-tui";
-import { stepCountIs, ToolLoopAgent, tool } from "ai";
+import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 
 const weatherTool = tool({
@@ -24,6 +23,6 @@ const agent = new ToolLoopAgent({
   },
 });
 
-const agentTUI = new AgentTUI(agent as unknown as AgentTUIAgent);
+const agentTUI = new AgentTUI(agent);
 
 await agentTUI.run({ prompt: Bun.argv.slice(2).join(" ") || undefined });

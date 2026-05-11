@@ -25,9 +25,10 @@ type AgentTUITextStreamResult = {
 };
 
 type AgentTUIAdapterStreamResult = AgentTUIStreamResult | AgentTUITextStreamResult;
+type AnyAISDKAgent = Agent<any, any, any, any>;
 
 export type AgentTUIAgent =
-  | Agent
+  | AnyAISDKAgent
   | {
       stream(
         options: AgentTUIStreamOptions,
@@ -405,7 +406,7 @@ function fileToDataUrl(mediaType: string, base64: string) {
   return `data:${mediaType};base64,${base64}`;
 }
 
-function isAISDKAgent(agent: AgentTUIAgent): agent is Agent {
+function isAISDKAgent(agent: AgentTUIAgent): agent is AnyAISDKAgent {
   return "version" in agent && agent.version === "agent-v1";
 }
 
