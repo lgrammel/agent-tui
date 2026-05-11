@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "weather": "bun --env-file=.env run index.ts --agent weather"
+    "weather": "bun --env-file=.env run index.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.0-canary.54",

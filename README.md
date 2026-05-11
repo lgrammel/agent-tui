@@ -54,9 +54,16 @@ compatible `stream({ messages })` method.
 
 ```ts
 import { AgentTUI } from "@lgrammel/agent-tui";
-import weatherAgent from "./agent/weather-agent";
+import { openai } from "@ai-sdk/openai";
+import { stepCountIs, ToolLoopAgent } from "ai";
 
-const tui = new AgentTUI(weatherAgent, {
+const agent = new ToolLoopAgent({
+  model: openai("gpt-4.1-mini"),
+  instructions: "You are a concise assistant.",
+  stopWhen: stepCountIs(5),
+});
+
+const tui = new AgentTUI(agent, {
   title: "Weather Agent",
 });
 
@@ -128,11 +135,7 @@ If a renderer does not implement `readPrompt`, call `run({ prompt })` with an in
 
 ## Example Project
 
-The basic example defines a `ToolLoopAgent` with a mock weather tool:
-
-- `examples/basic/agent/weather-agent.ts`: AI SDK agent setup.
-- `examples/basic/tool/weather-tool.ts`: weather tool implementation.
-- `examples/basic/index.ts`: CLI entry point that loads an agent and runs `AgentTUI`.
+The basic example defines a `ToolLoopAgent` with a mock weather tool in `examples/basic/index.ts`.
 
 ## Development
 
