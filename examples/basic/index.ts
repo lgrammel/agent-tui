@@ -1,5 +1,5 @@
 import { AgentTUI } from "@lgrammel/agent-tui";
-import type { Agent, ToolSet } from "ai";
+import type { AgentTUIAgent } from "@lgrammel/agent-tui";
 import { parseArgs } from "util";
 
 const { values, positionals } = parseArgs({
@@ -13,7 +13,7 @@ const { values, positionals } = parseArgs({
 
 const agentPath = `./agent/${values.agent}-agent.ts`;
 
-const agent = (await import(agentPath)).default as Agent<ToolSet, unknown, unknown>;
+const agent = (await import(agentPath)).default as AgentTUIAgent;
 
 const agentTUI = new AgentTUI(agent);
 

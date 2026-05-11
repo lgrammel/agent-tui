@@ -1,4 +1,4 @@
-import type { StreamTextResult } from "ai";
+import type { AgentTUIStreamResult } from "../agent-tui";
 import { clampScrollOffset, renderScreen } from "./layout";
 
 export type TerminalInput = NodeJS.ReadStream & {
@@ -102,7 +102,7 @@ export class TerminalRenderer {
   }
 
   async renderStream(
-    result: StreamTextResult<any, any, any>,
+    result: AgentTUIStreamResult,
     options?: TerminalSessionOptions,
   ): Promise<void> {
     this.#start(options);

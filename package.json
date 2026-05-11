@@ -12,7 +12,7 @@
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",
     "test": "vitest run",
-    "weather": "bun --cwd examples/basic run weather"
+    "weather": "bun run --cwd examples/basic weather"
   },
   "devDependencies": {
     "@types/bun": "latest",

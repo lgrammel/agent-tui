@@ -1,12 +1,24 @@
 import { TerminalRenderer } from "./tui/terminal-renderer";
-import type { Agent, StreamTextResult, ToolSet } from "ai";
+
+export type AgentTUIStreamPart =
+  | { type: "text-delta"; text: string }
+  | { type: "reasoning-start" }
+  | { type: "reasoning-delta"; text: string }
+  | { type: "reasoning-end" }
+  | { type: "tool-call"; [key: string]: unknown }
+  | { type: "tool-result"; [key: string]: unknown };
+
+export type AgentTUIStreamResult = {
+  fullStream: AsyncIterable<AgentTUIStreamPart>;
+};
+
+export type AgentTUIAgent = {
+  stream(options: { prompt: string }): Promise<AgentTUIStreamResult> | AgentTUIStreamResult;
+};
 
 export type AgentTUIRenderer = {
   readPrompt?(options?: AgentTUISessionOptions): Promise<string>;
-  renderStream(
-    result: StreamTextResult<any, any, any>,
-    options?: AgentTUISessionOptions,
-  ): Promise<void>;
+  renderStream(result: AgentTUIStreamResult, options?: AgentTUISessionOptions): Promise<void>;
 };
 
 export type AgentTUIOptions = {
@@ -24,12 +36,12 @@ export type AgentTUISessionOptions = {
   initialPrompt?: string;
 };
 
-export class AgentTUI<TOutput = unknown, TTools extends ToolSet = ToolSet> {
-  readonly #agent: Agent<TOutput, TTools, any>;
+export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
+  readonly #agent: TAgent;
   readonly #renderer: AgentTUIRenderer;
   readonly #title?: string;
 
-  constructor(agent: Agent<TOutput, TTools, any>, options?: AgentTUIOptions) {
+  constructor(agent: TAgent, options?: AgentTUIOptions) {
     this.#agent = agent;
     this.#renderer = options?.renderer ?? defaultRenderer;
     this.#title = options?.title;
