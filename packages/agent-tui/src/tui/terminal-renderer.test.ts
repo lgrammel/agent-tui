@@ -7,6 +7,8 @@ import {
   type TerminalOutput,
 } from "./terminal-renderer";
 import { stripAnsi } from "./layout";
+import type { AgentTUIStreamResult } from "../agent-tui";
+import type { UIMessageChunk } from "ai";
 
 describe("parseKey", () => {
   it("decodes terminal control keys", () => {
@@ -82,10 +84,11 @@ describe("TerminalRenderer", () => {
     });
 
     expect(output.text()).toContain("\x1b[94m╭ Reasoning ");
-    expect(output.text()).toContain("\x1b[95m╭ Tool Call · weather ");
-    expect(output.text()).toContain("\x1b[95m╭ Tool Result · weather ");
+    expect(output.text()).toContain("\x1b[95m╭ Tool · weather ");
     expect(stripAnsi(output.text())).toContain("thinking");
-    expect(stripAnsi(output.text())).toContain('"toolName": "weather"');
+    expect(stripAnsi(output.text())).toContain("Input:");
+    expect(stripAnsi(output.text())).toContain("Output:");
+    expect(stripAnsi(output.text())).toContain('"weather": "sunny"');
   });
 
   it("renders stream errors into the body box", async () => {
@@ -167,43 +170,50 @@ function createOutput() {
   return output;
 }
 
-function createStream(chunks: string[]) {
+function createStream(chunks: string[]): AgentTUIStreamResult {
   return {
-    fullStream: (async function* () {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield { type: "text-start", id: "text-1" };
       for (const text of chunks) {
-        yield { type: "text-delta", text };
+        yield { type: "text-delta", id: "text-1", delta: text };
       }
+      yield { type: "text-end", id: "text-1" };
+      yield { type: "finish" };
     })(),
   };
 }
 
-function createMixedStream() {
+function createMixedStream(): AgentTUIStreamResult {
   return {
-    fullStream: (async function* () {
-      yield { type: "reasoning-start" };
-      yield { type: "reasoning-delta", text: "thinking" };
-      yield { type: "reasoning-end" };
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield { type: "reasoning-start", id: "reasoning-1" };
+      yield { type: "reasoning-delta", id: "reasoning-1", delta: "thinking" };
+      yield { type: "reasoning-end", id: "reasoning-1" };
       yield {
-        type: "tool-call",
+        type: "tool-input-available",
         toolCallId: "call-1",
         toolName: "weather",
         input: { city: "Berlin" },
-      };
+      } satisfies UIMessageChunk;
       yield {
-        type: "tool-result",
+        type: "tool-output-available",
         toolCallId: "call-1",
-        toolName: "weather",
-        input: { city: "Berlin" },
         output: { city: "Berlin", weather: "sunny" },
-      };
+      } satisfies UIMessageChunk;
+      yield { type: "finish" };
     })(),
   };
 }
 
-function createErrorStream(error: unknown) {
+function createErrorStream(error: unknown): AgentTUIStreamResult {
   return {
-    fullStream: (async function* () {
-      yield { type: "error", error };
+    uiMessageStream: (async function* () {
+      yield {
+        type: "error",
+        errorText: error instanceof Error ? error.message : String(error),
+      };
     })(),
   };
 }

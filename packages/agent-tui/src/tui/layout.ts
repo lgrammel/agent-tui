@@ -1,7 +1,9 @@
 import { renderMarkdown } from "./markdown";
 
 const horizontal = "─";
-const ansiPattern = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+const ansiEscape = String.fromCharCode(27);
+const ansiPattern = new RegExp(`${ansiEscape}\\[[0-?]*[ -/]*[@-~]`, "g");
+const ansiPrefixPattern = new RegExp(`^${ansiEscape}\\[[0-?]*[ -/]*[@-~]`);
 
 export type TUIScreenState = {
   width: number;
@@ -94,7 +96,7 @@ export function sliceVisible(input: string, width: number): string {
   let index = 0;
 
   while (index < input.length && visible < width) {
-    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+    const ansiMatch = input.slice(index).match(ansiPrefixPattern);
 
     if (ansiMatch) {
       output += ansiMatch[0];
@@ -136,7 +138,7 @@ function findBreakPoint(input: string, width: number): number {
   let lastSpace = -1;
 
   while (index < input.length && visible <= width) {
-    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+    const ansiMatch = input.slice(index).match(ansiPrefixPattern);
 
     if (ansiMatch) {
       index += ansiMatch[0].length;
@@ -190,7 +192,7 @@ function indexAtVisibleWidth(input: string, width: number): number {
   let visible = 0;
 
   while (index < input.length && visible < width) {
-    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+    const ansiMatch = input.slice(index).match(ansiPrefixPattern);
 
     if (ansiMatch) {
       index += ansiMatch[0].length;

@@ -1,6 +1,15 @@
 import type { AgentTUIStreamResult } from "../agent-tui";
 import { clampScrollOffset, renderScreen, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
+import {
+  getToolName,
+  isToolUIPart,
+  readUIMessageStream,
+  type DynamicToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+  type UIMessageChunk,
+} from "ai";
 
 export type TerminalInput = NodeJS.ReadStream & {
   setRawMode?: (mode: boolean) => TerminalInput;
@@ -40,6 +49,7 @@ type ChatSection = {
   kind: ChatSectionKind;
   title: string;
   content: string;
+  id?: string;
 };
 
 const colors = {
@@ -105,7 +115,7 @@ export class TerminalRenderer {
           case "enter": {
             const prompt = this.#inputText;
             this.#inputActive = false;
-            this.#sections.push({ kind: "user", title: "User", content: prompt });
+            this.#addUserSection(prompt);
             this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
             this.#inputText = "";
             this.#paint();
@@ -133,7 +143,7 @@ export class TerminalRenderer {
   async renderStream(
     result: AgentTUIStreamResult,
     options?: TerminalSessionOptions,
-  ): Promise<void> {
+  ): Promise<UIMessage | undefined> {
     this.#start(options);
     this.#addSubmittedPrompt(options?.submittedPrompt);
     this.#inputActive = false;
@@ -142,53 +152,19 @@ export class TerminalRenderer {
     this.#paint();
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
     this.#attachInput();
+    let responseMessage: UIMessage | undefined;
 
     try {
-      for await (const part of result.fullStream) {
+      for await (const message of readUIMessageStream({
+        stream: toReadableStream(this.#observeUIMessageStream(result.uiMessageStream)),
+        onError: (error) => this.#addErrorSection("Error", formatStreamError(error)),
+      })) {
         if (this.#interrupted) {
           break;
         }
 
-        switch (part.type) {
-          case "reasoning-start":
-            if (this.#includeReasoning) {
-              this.#startSection("reasoning", "Reasoning");
-            }
-            break;
-          case "reasoning-delta":
-            if (this.#includeReasoning) {
-              this.#appendToSection("reasoning", "Reasoning", part.text);
-            }
-            break;
-          case "reasoning-end":
-            if (this.#includeReasoning) {
-              this.#paintAfterBodyChange();
-            }
-            break;
-          case "text-delta":
-            this.#appendToSection("assistant", "Assistant", part.text);
-            break;
-          case "tool-call":
-            this.#addSection(
-              "tool",
-              `Tool Call · ${part.toolName ?? "unknown"}`,
-              formatToolPart(part),
-            );
-            break;
-          case "tool-result":
-            this.#addSection(
-              "tool",
-              `Tool Result · ${part.toolName ?? "unknown"}`,
-              formatToolPart(part),
-            );
-            break;
-          case "tool-error":
-            this.#addSection("error", "Tool Error", formatStreamError(part.error));
-            break;
-          case "error":
-            this.#addSection("error", "Error", formatStreamError(part.error));
-            break;
-        }
+        responseMessage = message;
+        this.#renderAssistantMessage(message);
       }
     } finally {
       this.#detachInput();
@@ -208,6 +184,8 @@ export class TerminalRenderer {
     if (this.#interrupted) {
       throw interruptedError();
     }
+
+    return responseMessage;
   }
 
   #start(options?: TerminalSessionOptions) {
@@ -291,11 +269,6 @@ export class TerminalRenderer {
     this.#paint();
   }
 
-  #startSection(kind: ChatSectionKind, title: string) {
-    this.#sections.push({ kind, title, content: "" });
-    this.#paintAfterBodyChange();
-  }
-
   #addSubmittedPrompt(prompt: string | undefined) {
     if (prompt == null) {
       return;
@@ -307,23 +280,94 @@ export class TerminalRenderer {
       return;
     }
 
-    this.#sections.push({ kind: "user", title: "User", content: prompt });
+    this.#addUserSection(prompt);
   }
 
-  #addSection(kind: ChatSectionKind, title: string, content: string) {
-    this.#sections.push({ kind, title, content });
+  #addUserSection(prompt: string) {
+    this.#sections.push({ kind: "user", title: "User", content: prompt });
     this.#paintAfterBodyChange();
   }
 
-  #appendToSection(kind: ChatSectionKind, title: string, text: string) {
-    const section = this.#sections.at(-1);
+  #renderAssistantMessage(message: UIMessage) {
+    const activeSectionIds = new Set<string>();
 
-    if (section?.kind === kind && section.title === title) {
-      section.content += text;
-    } else {
-      this.#sections.push({ kind, title, content: text });
+    for (const [index, part] of message.parts.entries()) {
+      const id = sectionId(message.id, index);
+
+      switch (part.type) {
+        case "text":
+          activeSectionIds.add(id);
+          this.#upsertSection({
+            id,
+            kind: "assistant",
+            title: "Assistant",
+            content: part.text,
+          });
+          break;
+        case "reasoning":
+          if (this.#includeReasoning) {
+            activeSectionIds.add(id);
+            this.#upsertSection({
+              id,
+              kind: "reasoning",
+              title: "Reasoning",
+              content: part.text,
+            });
+          }
+          break;
+        default:
+          if (isToolUIPart(part)) {
+            activeSectionIds.add(id);
+            this.#upsertSection({
+              id,
+              ...renderToolInvocation(part),
+            });
+          }
+          break;
+      }
     }
 
+    this.#removeStaleAssistantSections(message.id, activeSectionIds);
+    this.#paintAfterBodyChange();
+  }
+
+  #upsertSection(section: ChatSection) {
+    const existingSection = section.id
+      ? this.#sections.find((candidate) => candidate.id === section.id)
+      : undefined;
+
+    if (existingSection) {
+      existingSection.kind = section.kind;
+      existingSection.title = section.title;
+      existingSection.content = section.content;
+      return;
+    }
+
+    this.#sections.push(section);
+  }
+
+  #removeStaleAssistantSections(messageId: string, activeSectionIds: Set<string>) {
+    const prefix = `${messageId}:`;
+    this.#sections = this.#sections.filter(
+      (section) =>
+        section.id == null || !section.id.startsWith(prefix) || activeSectionIds.has(section.id),
+    );
+  }
+
+  async *#observeUIMessageStream(
+    stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
+  ): AsyncIterable<UIMessageChunk> {
+    for await (const chunk of iterateUIMessageStream(stream)) {
+      if (chunk.type === "error") {
+        this.#addErrorSection("Error", chunk.errorText);
+      }
+
+      yield chunk;
+    }
+  }
+
+  #addErrorSection(title: string, content: string) {
+    this.#sections.push({ kind: "error", title, content });
     this.#paintAfterBodyChange();
   }
 
@@ -422,8 +466,115 @@ function formatStreamError(error: unknown) {
   return JSON.stringify(error);
 }
 
-function formatToolPart(part: unknown) {
-  return JSON.stringify(part, null, 2);
+function renderToolInvocation(part: ToolUIPart | DynamicToolUIPart): ChatSection {
+  const toolName = getToolName(part);
+  const title = `Tool · ${part.title ?? toolName}`;
+  const input = "input" in part ? part.input : undefined;
+  const inputText = input === undefined ? "Input: (streaming...)" : `Input:\n${formatValue(input)}`;
+
+  switch (part.state) {
+    case "input-streaming":
+      return {
+        kind: "tool",
+        title,
+        content: `Status: input streaming\n${inputText}`,
+      };
+    case "input-available":
+      return {
+        kind: "tool",
+        title,
+        content: `Status: running\n${inputText}`,
+      };
+    case "approval-requested":
+      return {
+        kind: "tool",
+        title,
+        content: `Status: awaiting approval\n${inputText}`,
+      };
+    case "approval-responded":
+      return {
+        kind: "tool",
+        title,
+        content: `Status: ${part.approval.approved ? "approved" : "denied"}\n${inputText}`,
+      };
+    case "output-available":
+      return {
+        kind: "tool",
+        title,
+        content: `${inputText}\n\nOutput:\n${formatValue(part.output)}`,
+      };
+    case "output-error":
+      return {
+        kind: "error",
+        title: `Tool Error · ${part.title ?? toolName}`,
+        content: `${inputText}\n\nError:\n${part.errorText}`,
+      };
+    case "output-denied":
+      return {
+        kind: "error",
+        title: `Tool Denied · ${part.title ?? toolName}`,
+        content: `${inputText}\n\nReason: ${part.approval.reason ?? "denied"}`,
+      };
+  }
+}
+
+function formatValue(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return JSON.stringify(value, null, 2);
+}
+
+function sectionId(messageId: string, partIndex: number) {
+  return `${messageId}:${partIndex}`;
+}
+
+function toReadableStream(
+  stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
+): ReadableStream<UIMessageChunk> {
+  if (stream instanceof ReadableStream) {
+    return stream;
+  }
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+}
+
+async function* iterateUIMessageStream(
+  stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
+): AsyncIterable<UIMessageChunk> {
+  if (stream instanceof ReadableStream) {
+    const reader = stream.getReader();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          return;
+        }
+
+        yield value;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return;
+  }
+
+  yield* stream;
 }
 
 function renderSection(section: ChatSection, width: number) {
