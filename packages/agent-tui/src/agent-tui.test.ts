@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentTUIRenderer } from "./agent-tui";
+
+let testRenderer: AgentTUIRenderer | undefined;
+
+vi.mock("./tui/terminal-renderer", () => ({
+  TerminalRenderer: vi.fn(() => {
+    if (!testRenderer) {
+      throw new Error("Expected a test renderer.");
+    }
+
+    return testRenderer;
+  }),
+}));
+
 import {
   AgentTUI,
   type AgentTUIAgent,
-  type AgentTUIRenderer,
   type AgentTUIStreamOptions,
 } from "./agent-tui";
 import {
@@ -14,14 +27,18 @@ import {
 } from "ai";
 
 describe("AgentTUI", () => {
+  beforeEach(() => {
+    testRenderer = undefined;
+  });
+
   it("prompts before the first turn when the initial prompt is omitted", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
-    const renderer = createRenderer({
+    const renderer = useRenderer(createRenderer({
       prompts: ["hello", undefined],
-    });
+    }));
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent, { renderer }).run();
+    await new AgentTUI(agent).run();
 
     expect(streamCalls).toEqual([
       {
@@ -33,12 +50,12 @@ describe("AgentTUI", () => {
 
   it("continues prompting after the initial prompt and passes message history", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
-    const renderer = createRenderer({
+    const renderer = useRenderer(createRenderer({
       prompts: ["second", undefined],
-    });
+    }));
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent, { renderer }).run({ prompt: "first" });
+    await new AgentTUI(agent).run({ prompt: "first" });
 
     expect(streamCalls).toEqual([
       {
@@ -57,12 +74,12 @@ describe("AgentTUI", () => {
 
   it("collects assistant text after tool calls in a multi-step stream", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
-    const renderer = createRenderer({
+    useRenderer(createRenderer({
       prompts: ["next", undefined],
-    });
+    }));
     const agent = createMultiStepAgent(streamCalls);
 
-    await new AgentTUI(agent, { renderer }).run({ prompt: "weather" });
+    await new AgentTUI(agent).run({ prompt: "weather" });
 
     expect(streamCalls).toEqual([
       {
@@ -80,17 +97,17 @@ describe("AgentTUI", () => {
 
   it("exits when prompt input is interrupted", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
-    const renderer: AgentTUIRenderer = {
+    useRenderer({
       async readPrompt() {
         throw new Error("Interrupted");
       },
       async renderStream() {
         throw new Error("Expected no stream to render.");
       },
-    };
+    });
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent, { renderer }).run();
+    await new AgentTUI(agent).run();
 
     expect(streamCalls).toEqual([]);
   });
@@ -121,6 +138,12 @@ function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAge
 }
 
 type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[] };
+
+function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): TRenderer {
+  testRenderer = renderer;
+
+  return renderer;
+}
 
 function createRenderer(options: { prompts: Array<string | undefined> }): TestRenderer {
   const submittedPrompts: string[] = [];

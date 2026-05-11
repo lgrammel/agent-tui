@@ -43,7 +43,6 @@ export type AgentTUIRenderer = {
 };
 
 export type AgentTUIOptions = {
-  renderer?: AgentTUIRenderer;
   title?: string;
 };
 
@@ -67,7 +66,7 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 
   constructor(agent: TAgent, options?: AgentTUIOptions) {
     this.#agent = agent;
-    this.#renderer = options?.renderer ?? defaultRenderer;
+    this.#renderer = new TerminalRenderer();
     this.#title = options?.title;
   }
 
@@ -150,8 +149,6 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     return normalizeStreamResult(result, messages, generateMessageId);
   }
 }
-
-const defaultRenderer: AgentTUIRenderer = new TerminalRenderer();
 
 function normalizeStreamResult(
   result: AgentTUIAdapterStreamResult,
