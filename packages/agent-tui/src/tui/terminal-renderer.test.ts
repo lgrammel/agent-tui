@@ -6,6 +6,7 @@ import {
   type TerminalInput,
   type TerminalOutput,
 } from "./terminal-renderer";
+import { stripAnsi } from "./layout";
 
 describe("parseKey", () => {
   it("decodes terminal control keys", () => {
@@ -32,11 +33,12 @@ describe("TerminalRenderer", () => {
     input.emit("data", Buffer.from("\r"));
 
     await expect(promptPromise).resolves.toBe("hi");
-    expect(output.text()).toContain("┌ Input ");
-    expect(output.text()).toContain("│ > hi");
+    expect(stripAnsi(output.text())).toContain("┌ Input ");
+    expect(stripAnsi(output.text())).toContain("│ > hi");
+    expect(stripAnsi(output.text())).toContain("╭ User ");
   });
 
-  it("streams text deltas into the body box", async () => {
+  it("streams assistant text into a colored body card", async () => {
     const input = createInput();
     const output = createOutput();
     const renderer = new TerminalRenderer({ input, output });
@@ -46,9 +48,44 @@ describe("TerminalRenderer", () => {
       waitForExit: false,
     });
 
-    expect(output.text()).toContain("│ █ Hello");
-    expect(output.text()).toContain("│ • there");
+    expect(output.text()).toContain("\x1b[92m╭ Assistant ");
+    expect(stripAnsi(output.text())).toContain("│ ╭ Assistant ");
+    expect(stripAnsi(output.text())).toContain("│ │ █ Hello");
+    expect(stripAnsi(output.text())).toContain("│ │ • there");
     expect(input.rawModes).toEqual([true, false]);
+  });
+
+  it("renders submitted prompts as user cards before assistant output", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(createStream(["hello"]) as never, {
+      title: "Test",
+      submittedPrompt: "what now?",
+      waitForExit: false,
+    });
+
+    expect(output.text()).toContain("\x1b[96m╭ User ");
+    expect(stripAnsi(output.text())).toContain("what now?");
+  });
+
+  it("renders reasoning and tool parts as distinct colored cards", async () => {
+    const input = createInput();
+    const output = createOutput();
+    output.rows = 20;
+    const renderer = new TerminalRenderer({ input, output, includeReasoning: true });
+
+    await renderer.renderStream(createMixedStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    expect(output.text()).toContain("\x1b[94m╭ Reasoning ");
+    expect(output.text()).toContain("\x1b[95m╭ Tool Call · weather ");
+    expect(output.text()).toContain("\x1b[95m╭ Tool Result · weather ");
+    expect(stripAnsi(output.text())).toContain("thinking");
+    expect(stripAnsi(output.text())).toContain('"toolName": "weather"');
   });
 
   it("renders stream errors into the body box", async () => {
@@ -61,7 +98,8 @@ describe("TerminalRenderer", () => {
       waitForExit: false,
     });
 
-    expect(output.text()).toContain("Error: Bad API key");
+    expect(output.text()).toContain("\x1b[91m╭ Error ");
+    expect(output.text()).toContain("Bad API key");
   });
 
   it("keeps the terminal session open between turns", async () => {
@@ -83,7 +121,7 @@ describe("TerminalRenderer", () => {
     input.emit("data", Buffer.from("\r"));
 
     await expect(promptPromise).resolves.toBe("next");
-    expect(output.text()).toContain("│ > next");
+    expect(stripAnsi(output.text())).toContain("│ > next");
   });
 });
 
@@ -135,6 +173,29 @@ function createStream(chunks: string[]) {
       for (const text of chunks) {
         yield { type: "text-delta", text };
       }
+    })(),
+  };
+}
+
+function createMixedStream() {
+  return {
+    fullStream: (async function* () {
+      yield { type: "reasoning-start" };
+      yield { type: "reasoning-delta", text: "thinking" };
+      yield { type: "reasoning-end" };
+      yield {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
+      };
+      yield {
+        type: "tool-result",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
+        output: { city: "Berlin", weather: "sunny" },
+      };
     })(),
   };
 }

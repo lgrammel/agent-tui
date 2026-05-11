@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampScrollOffset, renderScreen, wrapText } from "./layout";
+import { clampScrollOffset, renderScreen, stripAnsi, visibleLength, wrapText } from "./layout";
 
 describe("wrapText", () => {
   it("wraps text at word boundaries", () => {
@@ -8,6 +8,14 @@ describe("wrapText", () => {
 
   it("preserves blank markdown lines", () => {
     expect(wrapText("one\n\nthree", 20)).toEqual(["one", "", "three"]);
+  });
+
+  it("wraps ANSI colored text by visible width", () => {
+    expect(wrapText("\x1b[92mhello from the terminal\x1b[0m", 10).map(stripAnsi)).toEqual([
+      "hello from",
+      "the",
+      "terminal",
+    ]);
   });
 });
 
@@ -43,6 +51,22 @@ describe("renderScreen", () => {
     expect(output).toContain("│ two                  │");
     expect(output).toContain("│ four                 │");
     expect(output).not.toContain("│ six                │");
+  });
+
+  it("pads ANSI colored body lines by visible width", () => {
+    const output = renderScreen({
+      width: 24,
+      height: 8,
+      title: "Chat",
+      body: "\x1b[92mgreen\x1b[0m",
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+    const greenLine = output.split("\n").find((line) => line.includes("green"));
+
+    expect(greenLine).toBeDefined();
+    expect(visibleLength(greenLine ?? "")).toBe(24);
   });
 });
 

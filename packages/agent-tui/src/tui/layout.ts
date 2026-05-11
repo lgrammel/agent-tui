@@ -1,6 +1,7 @@
 import { renderMarkdown } from "./markdown";
 
 const horizontal = "─";
+const ansiPattern = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 
 export type TUIScreenState = {
   width: number;
@@ -63,13 +64,54 @@ export function wrapText(input: string, width: number): string[] {
 
     let remaining = rawLine;
 
-    while (remaining.length > width) {
+    while (visibleLength(remaining) > width) {
       const breakAt = findBreakPoint(remaining, width);
       output.push(remaining.slice(0, breakAt).trimEnd());
       remaining = remaining.slice(breakAt).trimStart();
     }
 
     output.push(remaining);
+  }
+
+  return output;
+}
+
+export function stripAnsi(input: string): string {
+  return input.replaceAll(ansiPattern, "");
+}
+
+export function visibleLength(input: string): number {
+  return stripAnsi(input).length;
+}
+
+export function sliceVisible(input: string, width: number): string {
+  if (width <= 0) {
+    return "";
+  }
+
+  let output = "";
+  let visible = 0;
+  let index = 0;
+
+  while (index < input.length && visible < width) {
+    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+
+    if (ansiMatch) {
+      output += ansiMatch[0];
+      index += ansiMatch[0].length;
+      continue;
+    }
+
+    const codePoint = input.codePointAt(index);
+
+    if (codePoint == null) {
+      break;
+    }
+
+    const character = String.fromCodePoint(codePoint);
+    output += character;
+    index += character.length;
+    visible += 1;
   }
 
   return output;
@@ -89,14 +131,39 @@ export function clampScrollOffset(
 }
 
 function findBreakPoint(input: string, width: number): number {
-  const slice = input.slice(0, width + 1);
-  const lastSpace = slice.lastIndexOf(" ");
+  let index = 0;
+  let visible = 0;
+  let lastSpace = -1;
+
+  while (index < input.length && visible <= width) {
+    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+
+    if (ansiMatch) {
+      index += ansiMatch[0].length;
+      continue;
+    }
+
+    const codePoint = input.codePointAt(index);
+
+    if (codePoint == null) {
+      break;
+    }
+
+    const character = String.fromCodePoint(codePoint);
+
+    if (character === " ") {
+      lastSpace = index;
+    }
+
+    index += character.length;
+    visible += 1;
+  }
 
   if (lastSpace > 0) {
     return lastSpace;
   }
 
-  return width;
+  return indexAtVisibleWidth(input, width);
 }
 
 function topBorder(width: number, title: string): string {
@@ -112,8 +179,34 @@ function bottomBorder(width: number): string {
 
 function boxLine(line: string, width: number): string {
   const contentWidth = width - 4;
-  const visible = line.slice(0, contentWidth);
-  const padding = " ".repeat(Math.max(0, contentWidth - visible.length));
+  const visible = sliceVisible(line, contentWidth);
+  const padding = " ".repeat(Math.max(0, contentWidth - visibleLength(visible)));
 
   return `│ ${visible}${padding} │`;
+}
+
+function indexAtVisibleWidth(input: string, width: number): number {
+  let index = 0;
+  let visible = 0;
+
+  while (index < input.length && visible < width) {
+    const ansiMatch = input.slice(index).match(/^\x1B\[[0-?]*[ -/]*[@-~]/);
+
+    if (ansiMatch) {
+      index += ansiMatch[0].length;
+      continue;
+    }
+
+    const codePoint = input.codePointAt(index);
+
+    if (codePoint == null) {
+      break;
+    }
+
+    const character = String.fromCodePoint(codePoint);
+    index += character.length;
+    visible += 1;
+  }
+
+  return index;
 }

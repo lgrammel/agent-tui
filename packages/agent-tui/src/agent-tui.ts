@@ -19,8 +19,8 @@ export type AgentTUIStreamOptions = {
 export type AgentTUIAgent =
   | Agent
   | {
-    stream(options: AgentTUIStreamOptions): Promise<AgentTUIStreamResult> | AgentTUIStreamResult;
-  };
+      stream(options: AgentTUIStreamOptions): Promise<AgentTUIStreamResult> | AgentTUIStreamResult;
+    };
 
 export type AgentTUIRenderer = {
   readPrompt?(options?: AgentTUISessionOptions): Promise<string | undefined>;
@@ -40,6 +40,7 @@ export type AgentTUIRunOptions = {
 export type AgentTUISessionOptions = {
   title?: string;
   initialPrompt?: string;
+  submittedPrompt?: string;
   waitForExit?: boolean;
   continueSession?: boolean;
 };
@@ -102,6 +103,7 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           },
           {
             title,
+            submittedPrompt: prompt,
             continueSession: Boolean(this.#renderer.readPrompt),
             waitForExit: false,
           },

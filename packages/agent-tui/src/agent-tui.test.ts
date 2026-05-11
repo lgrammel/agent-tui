@@ -22,6 +22,7 @@ describe("AgentTUI", () => {
         messages: [{ role: "user", content: "hello" }],
       },
     ]);
+    expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
 
   it("continues prompting after the initial prompt and passes message history", async () => {
@@ -45,6 +46,7 @@ describe("AgentTUI", () => {
         ],
       },
     ]);
+    expect(renderer.submittedPrompts).toEqual(["first", "second"]);
   });
 
   it("collects assistant text after tool calls in a multi-step stream", async () => {
@@ -112,12 +114,21 @@ function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAge
   };
 }
 
-function createRenderer(options: { prompts: Array<string | undefined> }): AgentTUIRenderer {
+type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[] };
+
+function createRenderer(options: { prompts: Array<string | undefined> }): TestRenderer {
+  const submittedPrompts: string[] = [];
+
   return {
+    submittedPrompts,
     async readPrompt() {
       return options.prompts.shift();
     },
-    async renderStream(result) {
+    async renderStream(result, sessionOptions) {
+      if (sessionOptions?.submittedPrompt) {
+        submittedPrompts.push(sessionOptions.submittedPrompt);
+      }
+
       for await (const _part of result.fullStream) {
         // Drain the stream so AgentTUI can collect assistant text.
       }
