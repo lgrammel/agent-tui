@@ -8,9 +8,15 @@ describe("renderMarkdown", () => {
     );
   });
 
-  it("removes inline markdown markers while streaming text stays readable", () => {
+  it("renders inline markdown styles as ANSI text", () => {
     expect(renderMarkdown("Use **bold**, *italic*, and `code`.")).toBe(
-      "Use bold, italic, and code.",
+      "Use \x1b[1mbold\x1b[22m, \x1b[3mitalic\x1b[23m, and code.",
+    );
+  });
+
+  it("supports underscore bold and italic markers", () => {
+    expect(renderMarkdown("Use __bold__ and _italic_.")).toBe(
+      "Use \x1b[1mbold\x1b[22m and \x1b[3mitalic\x1b[23m.",
     );
   });
 
