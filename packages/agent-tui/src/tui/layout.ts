@@ -145,6 +145,17 @@ export function sliceVisible(input: string, width: number): string {
     visible += characterWidth;
   }
 
+  while (index < input.length) {
+    const ansiMatch = input.slice(index).match(ansiPrefixPattern);
+
+    if (!ansiMatch) {
+      break;
+    }
+
+    output += ansiMatch[0];
+    index += ansiMatch[0].length;
+  }
+
   return output;
 }
 

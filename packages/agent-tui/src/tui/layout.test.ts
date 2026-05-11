@@ -93,6 +93,21 @@ describe("renderScreen", () => {
     expect(visibleLength(greenLine ?? "")).toBe(24);
   });
 
+  it("preserves trailing ANSI resets when colored content exactly fills a line", () => {
+    const output = renderScreen({
+      width: 24,
+      height: 8,
+      title: "Chat",
+      body: `\x1b[92m${"g".repeat(20)}\x1b[0m`,
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+    const greenLine = output.split("\n").find((line) => line.includes("g".repeat(20)));
+
+    expect(greenLine).toBe(`│ \x1b[92m${"g".repeat(20)}\x1b[0m │`);
+  });
+
   it("keeps wide unicode body lines within the screen width", () => {
     const output = renderScreen({
       width: 20,
