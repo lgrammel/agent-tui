@@ -16,7 +16,6 @@ reusable package in `packages/agent-tui` and a weather-agent example in `example
 - Arrow-key scrolling for long conversations.
 - Basic markdown rendering for headings, bullets, numbered lists, blockquotes, bold, italic, and inline code.
 - Custom terminal input/output streams for tests or embedded CLIs.
-- Custom renderer support for replacing the default terminal UI.
 
 See `docs/features.md` for more detail about the session runner, renderer, markdown support, and
 customization points.
@@ -38,22 +37,16 @@ cp examples/basic/.env.example examples/basic/.env
 Run the included weather example:
 
 ```bash
-bun run weather "what is the weather in london?"
-```
-
-You can also start the TUI without an initial prompt and type into the terminal:
-
-```bash
 bun run weather
 ```
 
 ## Usage
 
-Import `AgentTUI` from `@lgrammel/agent-tui` and pass it an AI SDK agent or any object with a
+Import `runAgentTUI` from `@lgrammel/agent-tui` and pass it an AI SDK agent or any object with a
 compatible `stream({ messages })` method.
 
 ```ts
-import { AgentTUI } from "@lgrammel/agent-tui";
+import { runAgentTUI } from "@lgrammel/agent-tui";
 import { openai } from "@ai-sdk/openai";
 import { stepCountIs, ToolLoopAgent } from "ai";
 
@@ -63,21 +56,14 @@ const agent = new ToolLoopAgent({
   stopWhen: stepCountIs(5),
 });
 
-const tui = new AgentTUI(agent, {
-  title: "Weather Agent",
-});
-
-await tui.run();
-```
-
-Pass an initial prompt for CLI-style commands. After the response streams, the default renderer keeps
-the session open so the user can ask follow-up questions.
-
-```ts
-await tui.run({
-  prompt: "what is the weather in london?",
+await runAgentTUI({
+  agent,
+  name: "Weather Agent",
 });
 ```
+
+The default renderer prompts the user for input and keeps the session open so the user can ask
+follow-up questions.
 
 ## Terminal Controls
 
@@ -92,31 +78,9 @@ await tui.run({
 Thinking/reasoning stream parts render automatically as blue sections whenever the agent stream
 contains them.
 
-## Custom Renderers
-
-`AgentTUI` accepts a custom renderer when you want to keep the session orchestration but render
-somewhere other than the default terminal UI.
-
-```ts
-import type { AgentTUIRenderer } from "@lgrammel/agent-tui";
-
-const renderer: AgentTUIRenderer = {
-  async readPrompt() {
-    return "hello";
-  },
-  async renderStream(result) {
-    for await (const chunk of result.uiMessageStream) {
-      // Render text, tool calls, errors, or reasoning parts in your own UI.
-    }
-  },
-};
-```
-
-If a renderer does not implement `readPrompt`, call `run({ prompt })` with an initial prompt.
-
 ## Package Exports
 
-- `AgentTUI`: session runner for AI SDK agents or compatible streaming agents.
+- `runAgentTUI`: session runner for AI SDK agents or compatible streaming agents.
 - `TerminalRenderer`: default full-screen terminal renderer.
 - `parseKey`: terminal key decoder used by the renderer.
 - `renderScreen`, `wrapText`, and `clampScrollOffset`: layout helpers for terminal UIs.

@@ -43,14 +43,9 @@ export type AgentTUIRenderer = {
   ): Promise<UIMessage | undefined>;
 };
 
-export type AgentTUIOptions = {
-  title?: string;
-  renderer?: AgentTUIRenderer;
-};
-
-export type AgentTUIRunOptions = {
-  prompt?: string;
-  title?: string;
+export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
+  agent: TAgent;
+  name: string;
 };
 
 export type AgentTUISessionOptions = {
@@ -61,23 +56,36 @@ export type AgentTUISessionOptions = {
   continueSession?: boolean;
 };
 
-export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
+export async function runAgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
+  options: RunAgentTUIOptions<TAgent>,
+) {
+  await new AgentTUIRunner(options.agent, {
+    name: options.name,
+  }).run();
+}
+
+type AgentTUIRunnerOptions = {
+  name: string;
+  renderer?: AgentTUIRenderer;
+};
+
+class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #agent: TAgent;
   readonly #renderer: AgentTUIRenderer;
-  readonly #title?: string;
+  readonly #name: string;
 
-  constructor(agent: TAgent, options?: AgentTUIOptions) {
+  constructor(agent: TAgent, options?: AgentTUIRunnerOptions) {
     this.#agent = agent;
     this.#renderer = options?.renderer ?? new TerminalRenderer();
-    this.#title = options?.title;
+    this.#name = options?.name ?? "Agent TUI";
   }
 
-  async run(options?: AgentTUIRunOptions) {
-    const title = options?.title ?? this.#title ?? "Agent TUI";
+  async run() {
+    const title = this.#name;
     const messages: UIMessage[] = [];
     let nextMessageIndex = 0;
     const generateMessageId = () => `message-${++nextMessageIndex}`;
-    let prompt = options?.prompt;
+    let prompt: string | undefined;
     let hasRunTurn = false;
 
     while (true) {

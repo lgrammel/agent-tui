@@ -16,7 +16,7 @@ vi.mock("./tui/terminal-renderer", () => ({
   }),
 }));
 
-import { AgentTUI, type AgentTUIAgent, type AgentTUIStreamOptions } from "./agent-tui";
+import { runAgentTUI, type AgentTUIAgent, type AgentTUIStreamOptions } from "./agent-tui";
 import {
   readUIMessageStream,
   type TextStreamPart,
@@ -25,13 +25,13 @@ import {
   type UIMessageChunk,
 } from "ai";
 
-describe("AgentTUI", () => {
+describe("runAgentTUI", () => {
   beforeEach(() => {
     testRenderer = undefined;
     terminalRendererOptions = [];
   });
 
-  it("prompts before the first turn when the initial prompt is omitted", async () => {
+  it("prompts before the first turn", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     const renderer = useRenderer(
       createRenderer({
@@ -40,7 +40,7 @@ describe("AgentTUI", () => {
     );
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent).run();
+    await runAgentTUI({ agent, name: "Test Agent" });
 
     expect(streamCalls).toEqual([
       {
@@ -50,16 +50,16 @@ describe("AgentTUI", () => {
     expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
 
-  it("continues prompting after the initial prompt and passes message history", async () => {
+  it("continues prompting and passes message history", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     const renderer = useRenderer(
       createRenderer({
-        prompts: ["second", undefined],
+        prompts: ["first", "second", undefined],
       }),
     );
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent).run({ prompt: "first" });
+    await runAgentTUI({ agent, name: "Test Agent" });
 
     expect(streamCalls).toEqual([
       {
@@ -80,12 +80,12 @@ describe("AgentTUI", () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     useRenderer(
       createRenderer({
-        prompts: ["next", undefined],
+        prompts: ["weather", "next", undefined],
       }),
     );
     const agent = createMultiStepAgent(streamCalls);
 
-    await new AgentTUI(agent).run({ prompt: "weather" });
+    await runAgentTUI({ agent, name: "Test Agent" });
 
     expect(streamCalls).toEqual([
       {
@@ -113,7 +113,7 @@ describe("AgentTUI", () => {
     });
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent).run();
+    await runAgentTUI({ agent, name: "Test Agent" });
 
     expect(streamCalls).toEqual([]);
   });
@@ -127,22 +127,25 @@ describe("AgentTUI", () => {
     );
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent).run({ prompt: "think" });
+    await runAgentTUI({ agent, name: "Test Agent" });
 
     expect(terminalRendererOptions).toEqual([undefined]);
   });
 
-  it("uses a custom renderer when provided", async () => {
+  it("uses the provided name as the session title", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
-    const renderer = createRenderer({
-      prompts: [undefined],
-    });
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["hello", undefined],
+      }),
+    );
     const agent = createAgent(streamCalls);
 
-    await new AgentTUI(agent, { renderer }).run({ prompt: "hello" });
+    await runAgentTUI({ agent, name: "Test Agent" });
 
-    expect(terminalRendererOptions).toEqual([]);
+    expect(terminalRendererOptions).toEqual([undefined]);
     expect(renderer.submittedPrompts).toEqual(["hello"]);
+    expect(renderer.titles).toEqual(["Test Agent", "Test Agent", "Test Agent"]);
   });
 });
 
@@ -170,7 +173,7 @@ function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAge
   };
 }
 
-type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[] };
+type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[]; titles: string[] };
 
 function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): TRenderer {
   testRenderer = renderer;
@@ -180,13 +183,23 @@ function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): T
 
 function createRenderer(options: { prompts: Array<string | undefined> }): TestRenderer {
   const submittedPrompts: string[] = [];
+  const titles: string[] = [];
 
   return {
     submittedPrompts,
-    async readPrompt() {
+    titles,
+    async readPrompt(sessionOptions) {
+      if (sessionOptions?.title) {
+        titles.push(sessionOptions.title);
+      }
+
       return options.prompts.shift();
     },
     async renderStream(result, sessionOptions) {
+      if (sessionOptions?.title) {
+        titles.push(sessionOptions.title);
+      }
+
       if (sessionOptions?.submittedPrompt) {
         submittedPrompts.push(sessionOptions.submittedPrompt);
       }

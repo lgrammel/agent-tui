@@ -5,10 +5,9 @@ agents.
 
 ## Session Runner
 
-`AgentTUI` owns the conversation loop:
+`runAgentTUI` owns the conversation loop:
 
-- Prompts for input when `run()` is called without an initial prompt.
-- Accepts one-shot CLI prompts with `run({ prompt })`.
+- Prompts for input when the session starts.
 - Sends the full message history to the agent on each turn.
 - Collects assistant text from streamed `text-delta` parts and adds it to the next turn's message history.
 - Stops cleanly when input or streaming is interrupted.
@@ -25,7 +24,7 @@ The wrapped agent can be an AI SDK `Agent` or any object with this shape:
 
 ## Terminal Renderer
 
-`TerminalRenderer` is the default renderer used by `AgentTUI`.
+`TerminalRenderer` is the default renderer used by `runAgentTUI`.
 
 - Uses the terminal alternate screen while active.
 - Shows conversation content above a pinned input or status panel.
@@ -56,21 +55,6 @@ You can customize the default terminal renderer with:
 
 - `input`: a custom readable terminal stream.
 - `output`: a custom writable terminal stream.
-
-You can replace the renderer entirely by passing an object that implements `AgentTUIRenderer`:
-
-```ts
-const renderer = {
-  async readPrompt() {
-    return "hello";
-  },
-  async renderStream(result) {
-    for await (const chunk of result.uiMessageStream) {
-      // Render the stream in your own interface.
-    }
-  },
-};
-```
 
 ## Public Helpers
 

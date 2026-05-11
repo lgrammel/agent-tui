@@ -1,16 +1,15 @@
-export { AgentTUI } from "./agent-tui";
+export { runAgentTUI } from "./agent-tui";
 export { TerminalFrameBuffer } from "./tui/terminal-frame-buffer";
 export { TerminalRenderer, parseKey } from "./tui/terminal-renderer";
 export { clampScrollOffset, renderScreen, wrapText } from "./tui/layout";
 export { renderMarkdown } from "./tui/markdown";
 export type {
   AgentTUIAgent,
-  AgentTUIOptions,
   AgentTUIRenderer,
-  AgentTUIRunOptions,
   AgentTUISessionOptions,
   AgentTUIStreamOptions,
   AgentTUIStreamResult,
+  RunAgentTUIOptions,
 } from "./agent-tui";
 export type {
   TerminalInput,
