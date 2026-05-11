@@ -6,9 +6,8 @@ export const weatherTool = tool({
   inputSchema: z.object({ city: z.string() }),
   async execute({ city }) {
     const weatherOptions = ["sunny", "cloudy", "rainy", "snowy", "windy"];
-    const weather =
-      weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
+    const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
 
-    return { temperature: 72, weather };
+    return { city, temperature: 72, weather };
   },
 });

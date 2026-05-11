@@ -1,19 +1,25 @@
 {
   "name": "agent-cli-template",
-  "module": "index.ts",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "module": "index.ts",
+  "scripts": {
+    "check": "bun run format:check && bun run lint",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint . --deny-warnings",
+    "weather": "bun run index.ts --agent weather"
+  },
   "dependencies": {
     "ai": "^5.1.0-beta.19",
     "zod": "^4"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0"
   },
   "peerDependencies": {
     "typescript": "^5"
-  },
-  "scripts": {
-    "weather": "bun run index.ts --agent weather"
   }
 }

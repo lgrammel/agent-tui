@@ -13,11 +13,7 @@ const { values, positionals } = parseArgs({
 
 const agentPath = `./agent/${values.agent}-agent.ts`;
 
-const agent = (await import(agentPath)).default as Agent<
-  ToolSet,
-  unknown,
-  unknown
->;
+const agent = (await import(agentPath)).default as Agent<ToolSet, unknown, unknown>;
 
 const result = agent.stream({ prompt: positionals[2]! });
 

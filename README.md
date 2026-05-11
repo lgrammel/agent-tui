@@ -16,6 +16,14 @@ Contains an example weather agent.
 bun run index.ts --agent weather "what is the weather in london?"
 ```
 
+## Development
+
+```bash
+bun run format
+bun run lint
+bun run check
+```
+
 ## Folders
 
 - `@/agent`: contains agents
