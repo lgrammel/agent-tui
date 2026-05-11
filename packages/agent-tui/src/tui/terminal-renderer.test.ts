@@ -126,6 +126,21 @@ describe("TerminalRenderer", () => {
     await expect(promptPromise).resolves.toBe("next");
     expect(stripAnsi(output.text())).toContain("│ > next█");
   });
+
+  it("fully repaints unchanged lines on resize", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+    const promptPromise = renderer.readPrompt({ title: "Test" });
+
+    output.emit("resize");
+
+    expect(output.chunks.at(-1)).toContain("\x1b[H\x1b[2J");
+    expect(stripAnsi(output.chunks.at(-1) ?? "")).toContain("┌ Test ");
+
+    input.emit("data", Buffer.from("\r"));
+    await expect(promptPromise).resolves.toBe("");
+  });
 });
 
 function createInput() {
@@ -157,10 +172,11 @@ function createInput() {
 
 function createOutput() {
   const chunks: string[] = [];
-  const output = new EventEmitter() as TerminalOutput & { text: () => string };
+  const output = new EventEmitter() as TerminalOutput & { chunks: string[]; text: () => string };
 
   output.columns = 40;
   output.rows = 10;
+  output.chunks = chunks;
   output.write = (chunk: string | Uint8Array) => {
     chunks.push(String(chunk));
     return true;

@@ -214,7 +214,7 @@ export class TerminalRenderer {
       this.#input.resume();
     }
 
-    this.#onResize = () => this.#paint();
+    this.#onResize = () => this.#repaint();
     this.#output.on("resize", this.#onResize);
   }
 
@@ -436,6 +436,11 @@ export class TerminalRenderer {
     });
 
     this.#frameBuffer.present(frame);
+  }
+
+  #repaint() {
+    this.#frameBuffer.reset();
+    this.#paint();
   }
 
   #body() {
