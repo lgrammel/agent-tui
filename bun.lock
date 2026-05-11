@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agent-cli-template",
+      "name": "@lgrammel/agent-tui",
       "dependencies": {
         "ai": "^5.1.0-beta.19",
         "zod": "^4",

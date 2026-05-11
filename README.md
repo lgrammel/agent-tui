@@ -1,6 +1,6 @@
-# agent-cli-template
+# agent-tui
 
-Template for running AI SDK agents with Bun in a terminal.
+Run AI SDK agents with Bun in a terminal.
 
 Contains an example weather agent.
 
@@ -32,4 +32,3 @@ bun run check
 ## Usage
 
 You can add your own agent and tools.
-You can use this template when creating a new GitHub repository.
