@@ -1,6 +1,7 @@
 import type { AgentTUIStreamResult } from "../agent-tui";
 import { clampScrollOffset, renderScreen, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
+import { TerminalFrameBuffer } from "./terminal-frame-buffer";
 import {
   getToolName,
   isToolUIPart,
@@ -24,6 +25,7 @@ export type TerminalRendererOptions = {
   input?: TerminalInput;
   output?: TerminalOutput;
   includeReasoning?: boolean;
+  frameBuffer?: TerminalFrameBuffer;
 };
 
 export type TerminalSessionOptions = {
@@ -74,6 +76,7 @@ export class TerminalRenderer {
   readonly #input: TerminalInput;
   readonly #output: TerminalOutput;
   readonly #includeReasoning: boolean;
+  readonly #frameBuffer: TerminalFrameBuffer;
 
   #sections: ChatSection[] = [];
   #inputText = "";
@@ -90,6 +93,7 @@ export class TerminalRenderer {
     this.#input = options?.input ?? process.stdin;
     this.#output = options?.output ?? process.stdout;
     this.#includeReasoning = options?.includeReasoning ?? false;
+    this.#frameBuffer = options?.frameBuffer ?? new TerminalFrameBuffer(this.#output);
   }
 
   async readPrompt(options?: TerminalSessionOptions): Promise<string> {
@@ -196,6 +200,7 @@ export class TerminalRenderer {
     }
 
     this.#isInteractive = true;
+    this.#frameBuffer.reset();
     this.#output.write("\x1b[?1049h\x1b[?25l");
 
     if (this.#input.isTTY) {
@@ -225,6 +230,7 @@ export class TerminalRenderer {
     }
 
     this.#output.write("\x1b[?25h\x1b[?1049l");
+    this.#frameBuffer.reset();
     this.#isInteractive = false;
   }
 
@@ -400,7 +406,7 @@ export class TerminalRenderer {
       status: this.#status,
     });
 
-    this.#output.write(`\x1b[H\x1b[2J${frame}`);
+    this.#frameBuffer.present(frame);
   }
 
   #body() {
