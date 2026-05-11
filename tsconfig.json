@@ -27,7 +27,7 @@
     "noPropertyAccessFromIndexSignature": false,
 
     "paths": {
-      "@lgrammel/agent-tui": ["./packages/agent-tui/index.ts"]
+      "@lgrammel/agent-tui": ["./packages/agent-tui/src/index.ts"]
     }
   }
 }

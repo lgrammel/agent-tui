@@ -13,9 +13,9 @@
     "directory": "packages/agent-tui"
   },
   "type": "module",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./src/index.ts"
   },
   "publishConfig": {
     "access": "public"
