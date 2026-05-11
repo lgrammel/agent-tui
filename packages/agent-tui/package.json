@@ -1,7 +1,7 @@
 {
   "name": "@lgrammel/agent-tui",
   "version": "0.0.0",
-  "description": "Run AI SDK agents with Bun in a terminal.",
+  "description": "Run AI SDK agents in a terminal UI.",
   "homepage": "https://github.com/lgrammel/agent-tui#readme",
   "bugs": {
     "url": "https://github.com/lgrammel/agent-tui/issues"
