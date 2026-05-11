@@ -36,11 +36,7 @@ The wrapped agent can be an AI SDK `Agent` or any object with this shape:
 - Handles terminal resize events.
 - Restores terminal raw mode and the normal screen on exit.
 
-Reasoning output is opt-in:
-
-```ts
-new TerminalRenderer({ includeReasoning: true });
-```
+Thinking/reasoning output is rendered automatically as blue reasoning sections when present.
 
 ## Markdown Support
 
@@ -60,7 +56,6 @@ You can customize the default terminal renderer with:
 
 - `input`: a custom readable terminal stream.
 - `output`: a custom writable terminal stream.
-- `includeReasoning`: whether reasoning stream parts are displayed.
 
 You can replace the renderer entirely by passing an object that implements `AgentTUIRenderer`:
 

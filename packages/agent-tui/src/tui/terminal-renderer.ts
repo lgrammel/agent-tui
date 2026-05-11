@@ -24,7 +24,6 @@ export type TerminalOutput = NodeJS.WriteStream & {
 export type TerminalRendererOptions = {
   input?: TerminalInput;
   output?: TerminalOutput;
-  includeReasoning?: boolean;
   frameBuffer?: TerminalFrameBuffer;
 };
 
@@ -77,7 +76,6 @@ const inputCursorBlinkMs = 500;
 export class TerminalRenderer {
   readonly #input: TerminalInput;
   readonly #output: TerminalOutput;
-  readonly #includeReasoning: boolean;
   readonly #frameBuffer: TerminalFrameBuffer;
 
   #sections: ChatSection[] = [];
@@ -96,7 +94,6 @@ export class TerminalRenderer {
   constructor(options?: TerminalRendererOptions) {
     this.#input = options?.input ?? process.stdin;
     this.#output = options?.output ?? process.stdout;
-    this.#includeReasoning = options?.includeReasoning ?? false;
     this.#frameBuffer = options?.frameBuffer ?? new TerminalFrameBuffer(this.#output);
   }
 
@@ -344,15 +341,13 @@ export class TerminalRenderer {
           });
           break;
         case "reasoning":
-          if (this.#includeReasoning) {
-            activeSectionIds.add(id);
-            this.#upsertSection({
-              id,
-              kind: "reasoning",
-              title: "Reasoning",
-              content: part.text,
-            });
-          }
+          activeSectionIds.add(id);
+          this.#upsertSection({
+            id,
+            kind: "reasoning",
+            title: "Reasoning",
+            content: part.text,
+          });
           break;
         default:
           if (isToolUIPart(part)) {

@@ -12,7 +12,7 @@ reusable package in `packages/agent-tui` and a weather-agent example in `example
 - Multi-turn sessions that preserve user and assistant message history between agent calls.
 - Streaming assistant output rendered as terminal cards.
 - Tool call, tool result, tool error, and stream error cards.
-- Optional reasoning cards for models that emit reasoning stream parts.
+- Blue reasoning cards for models that emit thinking/reasoning stream parts.
 - Arrow-key scrolling for long conversations.
 - Basic markdown rendering for headings, bullets, numbered lists, blockquotes, bold, italic, and inline code.
 - Custom terminal input/output streams for tests or embedded CLIs.
@@ -87,20 +87,10 @@ await tui.run({
 - When using `TerminalRenderer.renderStream()` directly with exit waiting enabled, press `q` or
   `Ctrl+C` after a completed render to exit.
 
-## Rendering Reasoning
+## Rendering Thinking
 
-Reasoning stream parts are hidden by default. Create a `TerminalRenderer` with
-`includeReasoning: true` when you want reasoning sections shown in the UI.
-
-```ts
-import { AgentTUI, TerminalRenderer } from "@lgrammel/agent-tui";
-
-const tui = new AgentTUI(agent, {
-  renderer: new TerminalRenderer({ includeReasoning: true }),
-});
-
-await tui.run();
-```
+Thinking/reasoning stream parts render automatically as blue sections whenever the agent stream
+contains them.
 
 ## Custom Renderers
 

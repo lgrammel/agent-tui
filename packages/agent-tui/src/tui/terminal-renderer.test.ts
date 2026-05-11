@@ -76,7 +76,7 @@ describe("TerminalRenderer", () => {
     const input = createInput();
     const output = createOutput();
     output.rows = 20;
-    const renderer = new TerminalRenderer({ input, output, includeReasoning: true });
+    const renderer = new TerminalRenderer({ input, output });
 
     await renderer.renderStream(createMixedStream() as never, {
       title: "Test",

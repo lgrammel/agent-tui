@@ -45,6 +45,7 @@ export type AgentTUIRenderer = {
 
 export type AgentTUIOptions = {
   title?: string;
+  renderer?: AgentTUIRenderer;
 };
 
 export type AgentTUIRunOptions = {
@@ -67,7 +68,7 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 
   constructor(agent: TAgent, options?: AgentTUIOptions) {
     this.#agent = agent;
-    this.#renderer = new TerminalRenderer();
+    this.#renderer = options?.renderer ?? new TerminalRenderer();
     this.#title = options?.title;
   }
 
