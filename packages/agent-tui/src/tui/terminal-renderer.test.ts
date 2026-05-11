@@ -16,6 +16,7 @@ describe("parseKey", () => {
     expect(parseKey(Buffer.from("\x1B[B"))).toEqual({ type: "down" });
     expect(parseKey(Buffer.from("\u007f"))).toEqual({ type: "backspace" });
     expect(parseKey(Buffer.from("\r"))).toEqual({ type: "enter" });
+    expect(parseKey(Buffer.from("\u0012"))).toEqual({ type: "ctrl-r" });
     expect(parseKey(Buffer.from("\u0003"))).toEqual({ type: "ctrl-c" });
   });
 
@@ -134,6 +135,21 @@ describe("TerminalRenderer", () => {
     const promptPromise = renderer.readPrompt({ title: "Test" });
 
     output.emit("resize");
+
+    expect(output.chunks.at(-1)).toContain("\x1b[H\x1b[2J");
+    expect(stripAnsi(output.chunks.at(-1) ?? "")).toContain("┌ Test ");
+
+    input.emit("data", Buffer.from("\r"));
+    await expect(promptPromise).resolves.toBe("");
+  });
+
+  it("fully repaints unchanged lines when Ctrl+R is pressed", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+    const promptPromise = renderer.readPrompt({ title: "Test" });
+
+    input.emit("data", Buffer.from("\u0012"));
 
     expect(output.chunks.at(-1)).toContain("\x1b[H\x1b[2J");
     expect(stripAnsi(output.chunks.at(-1) ?? "")).toContain("┌ Test ");

@@ -41,6 +41,7 @@ export type TerminalKey =
   | { type: "enter" }
   | { type: "up" }
   | { type: "down" }
+  | { type: "ctrl-r" }
   | { type: "ctrl-c" }
   | { type: "ignore" };
 
@@ -135,6 +136,9 @@ export class TerminalRenderer {
           case "up":
           case "down":
             this.#handleScroll(key.type);
+            break;
+          case "ctrl-r":
+            this.#repaint();
             break;
           case "ctrl-c":
             this.#stopInputCursorBlink();
@@ -261,6 +265,9 @@ export class TerminalRenderer {
       case "up":
       case "down":
         this.#handleScroll(key.type);
+        break;
+      case "ctrl-r":
+        this.#repaint();
         break;
       case "ctrl-c":
         this.#interrupted = true;
@@ -469,6 +476,9 @@ export class TerminalRenderer {
           case "down":
             this.#handleScroll(key.type);
             break;
+          case "ctrl-r":
+            this.#repaint();
+            break;
           case "character":
             if (key.value === "q") {
               this.#detachInput();
@@ -674,6 +684,8 @@ export function parseKey(chunk: Buffer): TerminalKey {
   const value = chunk.toString("utf8");
 
   switch (value) {
+    case "\u0012":
+      return { type: "ctrl-r" };
     case "\u0003":
       return { type: "ctrl-c" };
     case "\r":
