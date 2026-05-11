@@ -41,6 +41,17 @@ describe("TerminalFrameBuffer", () => {
     expect(output.chunks.at(-1)).toBe("\x1b[2;1H\x1b[2K\x1b[3;1H\x1b[2K");
   });
 
+  it("fully repaints after external writes move the cursor", () => {
+    const output = createOutput();
+    const buffer = new TerminalFrameBuffer(output, { useSynchronizedUpdates: false });
+
+    buffer.present("one\ntwo");
+    output.write("external\n");
+    buffer.present("one\nchanged");
+
+    expect(output.chunks.at(-1)).toBe("\x1b[H\x1b[2Jone\nchanged");
+  });
+
   it("wraps writes in synchronized update markers by default", () => {
     const output = createOutput();
     const buffer = new TerminalFrameBuffer(output);
@@ -48,6 +59,18 @@ describe("TerminalFrameBuffer", () => {
     buffer.present("frame");
 
     expect(output.text()).toBe("\x1b[?2026h\x1b[H\x1b[2Jframe\x1b[?2026l");
+  });
+
+  it("preserves callbacks on external writes", () => {
+    const output = createOutput();
+    new TerminalFrameBuffer(output, { useSynchronizedUpdates: false });
+    let callbackCalled = false;
+
+    output.write("external", () => {
+      callbackCalled = true;
+    });
+
+    expect(callbackCalled).toBe(true);
   });
 
   it("resets the previous frame", () => {
@@ -69,8 +92,11 @@ function createOutput() {
     text: () => string;
   } = {
     chunks,
-    write(chunk) {
+    write(chunk, encodingOrCallback) {
       chunks.push(String(chunk));
+      if (typeof encodingOrCallback === "function") {
+        encodingOrCallback();
+      }
       return true;
     },
     text() {

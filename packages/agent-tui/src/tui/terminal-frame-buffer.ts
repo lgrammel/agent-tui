@@ -1,5 +1,9 @@
 export type TerminalFrameOutput = {
-  write(chunk: string | Uint8Array): boolean;
+  write(
+    chunk: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean;
 };
 
 export type TerminalFrameBufferOptions = {
@@ -18,23 +22,39 @@ type FrameSnapshot = {
 };
 
 export class TerminalFrameBuffer {
-  readonly #output: TerminalFrameOutput;
   readonly #useSynchronizedUpdates: boolean;
+  readonly #originalWrite: TerminalFrameOutput["write"];
 
   #previousFrame?: FrameSnapshot;
+  #isWritingFrame = false;
+  #externalWriteSinceLastFrame = false;
 
   constructor(output: TerminalFrameOutput, options?: TerminalFrameBufferOptions) {
-    this.#output = output;
+    this.#originalWrite = output.write.bind(output);
     this.#useSynchronizedUpdates = options?.useSynchronizedUpdates ?? true;
+
+    output.write = ((
+      chunk: string | Uint8Array,
+      encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+      callback?: (error?: Error | null) => void,
+    ) => {
+      if (!this.#isWritingFrame) {
+        this.#externalWriteSinceLastFrame = true;
+      }
+
+      return this.#originalWrite(chunk, encodingOrCallback, callback);
+    }) as TerminalFrameOutput["write"];
   }
 
   present(frame: string) {
     const nextFrame = snapshotFrame(frame);
-    const update = this.#previousFrame
-      ? diffFrame(this.#previousFrame, nextFrame)
-      : `${cursorHome}${clearScreen}${frame}`;
+    const update =
+      this.#previousFrame && !this.#externalWriteSinceLastFrame
+        ? diffFrame(this.#previousFrame, nextFrame)
+        : `${cursorHome}${clearScreen}${frame}`;
 
     this.#previousFrame = nextFrame;
+    this.#externalWriteSinceLastFrame = false;
 
     if (update.length === 0) {
       return;
@@ -48,12 +68,18 @@ export class TerminalFrameBuffer {
   }
 
   #writeUpdate(update: string) {
-    if (!this.#useSynchronizedUpdates) {
-      this.#output.write(update);
-      return;
-    }
+    this.#isWritingFrame = true;
 
-    this.#output.write(`${synchronizeStart}${update}${synchronizeEnd}`);
+    try {
+      if (!this.#useSynchronizedUpdates) {
+        this.#originalWrite(update);
+        return;
+      }
+
+      this.#originalWrite(`${synchronizeStart}${update}${synchronizeEnd}`);
+    } finally {
+      this.#isWritingFrame = false;
+    }
   }
 }
 

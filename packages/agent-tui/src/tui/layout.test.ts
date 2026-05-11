@@ -6,6 +6,15 @@ describe("wrapText", () => {
     expect(wrapText("hello from the terminal", 10)).toEqual(["hello from", "the", "terminal"]);
   });
 
+  it("wraps wide unicode by terminal cell width", () => {
+    expect(wrapText("hello 世界", 8)).toEqual(["hello", "世界"]);
+  });
+
+  it("does not count combining marks as extra terminal cells", () => {
+    expect(visibleLength("e\u0301")).toBe(1);
+    expect(wrapText("e\u0301clair", 6)).toEqual(["e\u0301clair"]);
+  });
+
   it("preserves blank markdown lines", () => {
     expect(wrapText("one\n\nthree", 20)).toEqual(["one", "", "three"]);
   });
@@ -82,6 +91,20 @@ describe("renderScreen", () => {
 
     expect(greenLine).toBeDefined();
     expect(visibleLength(greenLine ?? "")).toBe(24);
+  });
+
+  it("keeps wide unicode body lines within the screen width", () => {
+    const output = renderScreen({
+      width: 20,
+      height: 8,
+      title: "Chat",
+      body: "世界".repeat(10),
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+
+    expect(output.split("\n").every((line) => visibleLength(line) === 20)).toBe(true);
   });
 });
 
