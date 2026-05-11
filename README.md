@@ -1,21 +1,139 @@
 # agent-tui
 
-Run AI SDK agents with Bun in a terminal.
+Run AI SDK agents in an interactive Bun terminal UI.
 
-This repo is a Bun monorepo with the package in `packages/agent-tui` and a basic weather agent example in
-`examples/basic`.
+`@lgrammel/agent-tui` wraps an AI SDK agent, streams its output into a full-screen terminal
+interface, and keeps the conversation going across turns. This repo is a Bun monorepo with the
+reusable package in `packages/agent-tui` and a weather-agent example in `examples/basic`.
 
-## Setup
+## Features
 
-1. Install [Bun](https://bun.com/)
-2. Run `bun i`
-3. Copy `examples/basic/.env.example` to `examples/basic/.env` and add an OpenAI API key
+- Interactive prompt input with a pinned input/status area.
+- Multi-turn sessions that preserve user and assistant message history between agent calls.
+- Streaming assistant output rendered as terminal cards.
+- Tool call, tool result, tool error, and stream error cards.
+- Optional reasoning cards for models that emit reasoning stream parts.
+- Arrow-key scrolling for long conversations.
+- Basic markdown rendering for headings, bullets, numbered lists, blockquotes, bold, italic, and inline code.
+- Custom terminal input/output streams for tests or embedded CLIs.
+- Custom renderer support for replacing the default terminal UI.
 
-## Example
+See `docs/features.md` for more detail about the session runner, renderer, markdown support, and
+customization points.
+
+## Quick Start
+
+Install dependencies:
+
+```bash
+bun i
+```
+
+Copy the example environment file and add an OpenAI API key:
+
+```bash
+cp examples/basic/.env.example examples/basic/.env
+```
+
+Run the included weather example:
 
 ```bash
 bun run weather "what is the weather in london?"
 ```
+
+You can also start the TUI without an initial prompt and type into the terminal:
+
+```bash
+bun run weather
+```
+
+## Usage
+
+Import `AgentTUI` from `@lgrammel/agent-tui` and pass it an AI SDK agent or any object with a
+compatible `stream({ messages })` method.
+
+```ts
+import { AgentTUI } from "@lgrammel/agent-tui";
+import weatherAgent from "./agent/weather-agent";
+
+const tui = new AgentTUI(weatherAgent, {
+  title: "Weather Agent",
+});
+
+await tui.run();
+```
+
+Pass an initial prompt for CLI-style commands. After the response streams, the default renderer keeps
+the session open so the user can ask follow-up questions.
+
+```ts
+await tui.run({
+  prompt: "what is the weather in london?",
+});
+```
+
+## Terminal Controls
+
+- Type a prompt and press `Enter` to submit it.
+- Press `Up` and `Down` to scroll through the conversation.
+- Press `Ctrl+C` while entering a prompt or streaming to stop the session.
+- When using `TerminalRenderer.renderStream()` directly with exit waiting enabled, press `q` or
+  `Ctrl+C` after a completed render to exit.
+
+## Rendering Reasoning
+
+Reasoning stream parts are hidden by default. Create a `TerminalRenderer` with
+`includeReasoning: true` when you want reasoning sections shown in the UI.
+
+```ts
+import { AgentTUI, TerminalRenderer } from "@lgrammel/agent-tui";
+
+const tui = new AgentTUI(agent, {
+  renderer: new TerminalRenderer({ includeReasoning: true }),
+});
+
+await tui.run();
+```
+
+## Custom Renderers
+
+`AgentTUI` accepts a custom renderer when you want to keep the session orchestration but render
+somewhere other than the default terminal UI.
+
+```ts
+import type { AgentTUIRenderer } from "@lgrammel/agent-tui";
+
+const renderer: AgentTUIRenderer = {
+  async readPrompt() {
+    return "hello";
+  },
+  async renderStream(result) {
+    for await (const part of result.fullStream) {
+      // Render text, tool calls, errors, or reasoning parts in your own UI.
+    }
+  },
+};
+```
+
+If a renderer does not implement `readPrompt`, call `run({ prompt })` with an initial prompt.
+
+## Package Exports
+
+- `AgentTUI`: session runner for AI SDK agents or compatible streaming agents.
+- `TerminalRenderer`: default full-screen terminal renderer.
+- `parseKey`: terminal key decoder used by the renderer.
+- `renderScreen`, `wrapText`, and `clampScrollOffset`: layout helpers for terminal UIs.
+- `renderMarkdown`: lightweight markdown-to-terminal formatting helper.
+- Type exports for agents, renderers, stream parts, session options, terminal input/output, and
+  renderer options.
+
+## Example Project
+
+The basic example defines a `ToolLoopAgent` with a mock weather tool:
+
+- `examples/basic/agent/weather-agent.ts`: AI SDK agent setup.
+- `examples/basic/tool/weather-tool.ts`: weather tool implementation.
+- `examples/basic/index.ts`: CLI entry point that loads an agent and runs `AgentTUI`.
 
 ## Development
 
@@ -23,13 +141,10 @@ bun run weather "what is the weather in london?"
 bun run format
 bun run lint
 bun run check
+bun run test
 ```
 
-## Folders
+## Repository Layout
 
-- `packages/agent-tui`: contains the reusable terminal UI package
-- `examples/basic`: contains a weather agent example
-
-## Usage
-
-Import `AgentTUI` from `@lgrammel/agent-tui` and pass it an AI SDK agent.
+- `packages/agent-tui`: reusable terminal UI package.
+- `examples/basic`: weather agent example.
