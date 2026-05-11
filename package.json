@@ -11,13 +11,20 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",
+    "package:build": "bun run --cwd packages/agent-tui build",
+    "package:pack:dry-run": "bun run --cwd packages/agent-tui pack:dry-run",
+    "package:release:dry-run": "bun run --cwd packages/agent-tui release:dry-run",
+    "package:release": "bun run --cwd packages/agent-tui release",
     "test": "vitest run",
     "weather": "bun run --cwd examples/basic weather"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/node": "^25.6.2",
     "oxfmt": "^0.48.0",
     "oxlint": "^1.63.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   }
 }
