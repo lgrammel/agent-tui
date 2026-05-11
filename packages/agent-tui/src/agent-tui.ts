@@ -8,26 +8,20 @@ import {
   type UIMessageChunk,
 } from "ai";
 
-export type AgentTUIMessage = UIMessage;
-export type AgentTUIStreamPart = UIMessageChunk;
-export type AgentTUIMessageStream =
-  | AsyncIterable<AgentTUIStreamPart>
-  | ReadableStream<AgentTUIStreamPart>;
-
 export type AgentTUIStreamResult = {
-  uiMessageStream: AgentTUIMessageStream;
+  uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
 };
 
 export type AgentTUIStreamOptions = {
-  messages: AgentTUIMessage[];
+  messages: UIMessage[];
 };
 
 type AgentTUITextStreamResult = {
   fullStream: AsyncIterable<TextStreamPart<ToolSet>>;
   toUIMessageStream?: (options?: {
-    originalMessages?: AgentTUIMessage[];
+    originalMessages?: UIMessage[];
     generateMessageId?: () => string;
-  }) => AgentTUIMessageStream;
+  }) => AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
 };
 
 type AgentTUIAdapterStreamResult = AgentTUIStreamResult | AgentTUITextStreamResult;
@@ -45,7 +39,7 @@ export type AgentTUIRenderer = {
   renderStream(
     result: AgentTUIStreamResult,
     options?: AgentTUISessionOptions,
-  ): Promise<AgentTUIMessage | undefined>;
+  ): Promise<UIMessage | undefined>;
 };
 
 export type AgentTUIOptions = {
@@ -79,7 +73,7 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 
   async run(options?: AgentTUIRunOptions) {
     const title = options?.title ?? this.#title ?? "Agent TUI";
-    const messages: AgentTUIMessage[] = [];
+    const messages: UIMessage[] = [];
     let nextMessageIndex = 0;
     const generateMessageId = () => `message-${++nextMessageIndex}`;
     let prompt = options?.prompt;
@@ -138,7 +132,7 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   }
 
   async #streamMessages(
-    messages: AgentTUIMessage[],
+    messages: UIMessage[],
     generateMessageId: () => string,
   ): Promise<AgentTUIStreamResult> {
     if (isAISDKAgent(this.#agent)) {
@@ -161,7 +155,7 @@ const defaultRenderer: AgentTUIRenderer = new TerminalRenderer();
 
 function normalizeStreamResult(
   result: AgentTUIAdapterStreamResult,
-  originalMessages: AgentTUIMessage[],
+  originalMessages: UIMessage[],
   generateMessageId: () => string,
 ): AgentTUIStreamResult {
   if ("uiMessageStream" in result) {
@@ -185,7 +179,7 @@ function normalizeStreamResult(
 async function* textStreamToUIMessageStream(
   stream: AsyncIterable<TextStreamPart<ToolSet>>,
   generateMessageId: () => string,
-): AsyncIterable<AgentTUIStreamPart> {
+): AsyncIterable<UIMessageChunk> {
   const openTextParts = new Set<string>();
   const openReasoningParts = new Set<string>();
   let sentFinish = false;
@@ -380,17 +374,17 @@ async function* textStreamToUIMessageStream(
 
 function* closeOpenParts(textPartIds: Set<string>, reasoningPartIds: Set<string>) {
   for (const id of textPartIds) {
-    yield { type: "text-end", id } satisfies AgentTUIStreamPart;
+    yield { type: "text-end", id } satisfies UIMessageChunk;
   }
   textPartIds.clear();
 
   for (const id of reasoningPartIds) {
-    yield { type: "reasoning-end", id } satisfies AgentTUIStreamPart;
+    yield { type: "reasoning-end", id } satisfies UIMessageChunk;
   }
   reasoningPartIds.clear();
 }
 
-function createUserMessage(id: string, text: string): AgentTUIMessage {
+function createUserMessage(id: string, text: string): UIMessage {
   return {
     id,
     role: "user",

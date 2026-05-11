@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   AgentTUI,
   type AgentTUIAgent,
-  type AgentTUIMessage,
   type AgentTUIRenderer,
   type AgentTUIStreamOptions,
-  type AgentTUIStreamPart,
 } from "./agent-tui";
-import { readUIMessageStream, type TextStreamPart, type ToolSet } from "ai";
+import {
+  readUIMessageStream,
+  type TextStreamPart,
+  type ToolSet,
+  type UIMessage,
+  type UIMessageChunk,
+} from "ai";
 
 describe("AgentTUI", () => {
   it("prompts before the first turn when the initial prompt is omitted", async () => {
@@ -131,7 +135,7 @@ function createRenderer(options: { prompts: Array<string | undefined> }): TestRe
         submittedPrompts.push(sessionOptions.submittedPrompt);
       }
 
-      let responseMessage: AgentTUIMessage | undefined;
+      let responseMessage: UIMessage | undefined;
 
       for await (const message of readUIMessageStream({
         stream: toReadableStream(result.uiMessageStream),
@@ -160,14 +164,14 @@ function lastUserMessage(options: AgentTUIStreamOptions) {
   return message;
 }
 
-function messageText(message: AgentTUIMessage) {
+function messageText(message: UIMessage) {
   return message.parts
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("");
 }
 
-function createUserMessage(id: string, text: string): AgentTUIMessage {
+function createUserMessage(id: string, text: string): UIMessage {
   return {
     id,
     role: "user",
@@ -175,7 +179,7 @@ function createUserMessage(id: string, text: string): AgentTUIMessage {
   };
 }
 
-function createAssistantMessage(id: string, text: string): AgentTUIMessage {
+function createAssistantMessage(id: string, text: string): UIMessage {
   return {
     id,
     role: "assistant",
@@ -183,7 +187,7 @@ function createAssistantMessage(id: string, text: string): AgentTUIMessage {
   };
 }
 
-function createAssistantMessageWithToolInvocation(id: string): AgentTUIMessage {
+function createAssistantMessageWithToolInvocation(id: string): UIMessage {
   return {
     id,
     role: "assistant",
@@ -201,8 +205,8 @@ function createAssistantMessageWithToolInvocation(id: string): AgentTUIMessage {
 }
 
 function toReadableStream(
-  stream: AsyncIterable<AgentTUIStreamPart> | ReadableStream<AgentTUIStreamPart>,
-): ReadableStream<AgentTUIStreamPart> {
+  stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
+): ReadableStream<UIMessageChunk> {
   if (stream instanceof ReadableStream) {
     return stream;
   }

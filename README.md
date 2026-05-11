@@ -108,7 +108,7 @@ const renderer: AgentTUIRenderer = {
     return "hello";
   },
   async renderStream(result) {
-    for await (const part of result.fullStream) {
+    for await (const chunk of result.uiMessageStream) {
       // Render text, tool calls, errors, or reasoning parts in your own UI.
     }
   },
@@ -124,8 +124,7 @@ If a renderer does not implement `readPrompt`, call `run({ prompt })` with an in
 - `parseKey`: terminal key decoder used by the renderer.
 - `renderScreen`, `wrapText`, and `clampScrollOffset`: layout helpers for terminal UIs.
 - `renderMarkdown`: lightweight markdown-to-terminal formatting helper.
-- Type exports for agents, renderers, stream parts, session options, terminal input/output, and
-  renderer options.
+- Type exports for agents, renderers, session options, terminal input/output, and renderer options.
 
 ## Example Project
 

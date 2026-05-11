@@ -17,8 +17,8 @@ The wrapped agent can be an AI SDK `Agent` or any object with this shape:
 
 ```ts
 {
-  stream(options: { messages: Array<{ role: "user" | "assistant"; content: string }> }): {
-    fullStream: AsyncIterable<TextStreamPart<ToolSet>>;
+  stream(options: { messages: UIMessage[] }): {
+    uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
   };
 }
 ```
@@ -70,7 +70,7 @@ const renderer = {
     return "hello";
   },
   async renderStream(result) {
-    for await (const part of result.fullStream) {
+    for await (const chunk of result.uiMessageStream) {
       // Render the stream in your own interface.
     }
   },
