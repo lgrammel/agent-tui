@@ -121,6 +121,28 @@ describe("renderScreen", () => {
 
     expect(output.split("\n").every((line) => visibleLength(line) === 20)).toBe(true);
   });
+
+  it("renders markdown tables without raw pipe borders inside the body box", () => {
+    const output = renderScreen({
+      width: 72,
+      height: 10,
+      title: "Chat",
+      body:
+        "| Feature | Detail |\n" +
+        "| :--- | :--- |\n" +
+        "| Language | German (Swiss German dialect) |\n" +
+        "| Transport | World-class public transit (trams, trains, and buses) |",
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+
+    expect(stripAnsi(output)).toContain("│ Feature    Detail");
+    expect(output).toContain("│ ─────────  ─────────────────────────────────────────────────────");
+    expect(output).toContain("│ Language   German (Swiss German dialect)");
+    expect(output).not.toContain("| Feature | Detail |");
+    expect(output.split("\n").every((line) => visibleLength(line) === 72)).toBe(true);
+  });
 });
 
 describe("clampScrollOffset", () => {
