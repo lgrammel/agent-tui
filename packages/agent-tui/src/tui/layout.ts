@@ -1,7 +1,7 @@
 import { renderMarkdown } from "./markdown";
 import { ansiPrefixPattern, codePointWidth, sliceVisible, visibleLength } from "./terminal-text";
 
-export { stripAnsi, visibleLength } from "./terminal-text";
+export { sliceVisible, stripAnsi, visibleLength } from "./terminal-text";
 
 const horizontal = "─";
 
