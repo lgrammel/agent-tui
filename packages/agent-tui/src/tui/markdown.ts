@@ -10,33 +10,39 @@ export function renderMarkdown(input: string): string {
   return lines
     .map((line) => {
       if (line.startsWith("### ")) {
-        return `▶ ${line.slice(4)}`;
+        return renderInlineMarkdown(`▶ ${line.slice(4)}`);
       }
 
       if (line.startsWith("## ")) {
-        return `■ ${line.slice(3)}`;
+        return renderInlineMarkdown(`■ ${line.slice(3)}`);
       }
 
       if (line.startsWith("# ")) {
-        return `█ ${line.slice(2)}`;
+        return renderInlineMarkdown(`█ ${line.slice(2)}`);
       }
 
-      if (line.startsWith("- ")) {
-        return `• ${line.slice(2)}`;
+      const unorderedListItem = line.match(/^(\s*)[-+*]\s+(.*)$/);
+      if (unorderedListItem) {
+        const [, indentation, text = ""] = unorderedListItem;
+        return renderInlineMarkdown(`${indentation}•${text.length > 0 ? ` ${text}` : ""}`);
       }
 
       if (/^\d+\. /.test(line)) {
-        return line.replace(/^(\d+)\. /, "$1. ");
+        return renderInlineMarkdown(line.replace(/^(\d+)\. /, "$1. "));
       }
 
       if (line.startsWith("> ")) {
-        return `│ ${line.slice(2)}`;
+        return renderInlineMarkdown(`│ ${line.slice(2)}`);
       }
 
-      return line;
+      return renderInlineMarkdown(line);
     })
-    .join("\n")
+    .join("\n");
+}
+
+function renderInlineMarkdown(input: string): string {
+  return input
     .replaceAll(/\*\*([^*]+)\*\*/g, "$1")
     .replaceAll(/`([^`]+)`/g, "$1")
-    .replaceAll(/\*([^*]+)\*/g, "$1");
+    .replaceAll(/\*([^*\n]+)\*/g, "$1");
 }
