@@ -20,6 +20,7 @@ export type TerminalSessionOptions = {
   title?: string;
   initialPrompt?: string;
   waitForExit?: boolean;
+  continueSession?: boolean;
 };
 
 export type TerminalKey =
@@ -90,7 +91,7 @@ export class TerminalRenderer {
             break;
           case "ctrl-c":
             this.#stop();
-            reject(new Error("Interrupted"));
+            reject(interruptedError());
             break;
           case "ignore":
             break;
@@ -148,10 +149,21 @@ export class TerminalRenderer {
       }
     } finally {
       this.#detachInput();
-      this.#status = "Done · ↑/↓ scroll · q/Ctrl+C quit";
+      this.#status = this.#interrupted
+        ? "Interrupted"
+        : options?.continueSession
+          ? "Done · Enter another prompt · ↑/↓ scroll · Ctrl+C quit"
+          : "Done · ↑/↓ scroll · q/Ctrl+C quit";
       this.#paint();
       await this.#waitForExit(options);
-      this.#stop();
+
+      if (this.#interrupted || !options?.continueSession) {
+        this.#stop();
+      }
+    }
+
+    if (this.#interrupted) {
+      throw interruptedError();
     }
   }
 
@@ -309,6 +321,10 @@ export class TerminalRenderer {
       this.#attachInput();
     });
   }
+}
+
+function interruptedError() {
+  return new Error("Interrupted");
 }
 
 export function parseKey(chunk: Buffer): TerminalKey {

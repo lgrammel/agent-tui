@@ -50,6 +50,28 @@ describe("TerminalRenderer", () => {
     expect(output.text()).toContain("│ • there");
     expect(input.rawModes).toEqual([true, false]);
   });
+
+  it("keeps the terminal session open between turns", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(createStream(["hello"]) as never, {
+      title: "Test",
+      continueSession: true,
+      waitForExit: false,
+    });
+
+    expect(output.text()).toContain("Done · Enter another prompt");
+    expect(input.rawModes).toEqual([true]);
+
+    const promptPromise = renderer.readPrompt({ title: "Test" });
+    input.emit("data", Buffer.from("next"));
+    input.emit("data", Buffer.from("\r"));
+
+    await expect(promptPromise).resolves.toBe("next");
+    expect(output.text()).toContain("│ > next");
+  });
 });
 
 function createInput() {
