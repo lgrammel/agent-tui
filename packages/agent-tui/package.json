@@ -1,0 +1,29 @@
+{
+  "name": "@lgrammel/agent-tui",
+  "version": "0.0.0",
+  "description": "Run AI SDK agents with Bun in a terminal.",
+  "homepage": "https://github.com/lgrammel/agent-tui#readme",
+  "bugs": {
+    "url": "https://github.com/lgrammel/agent-tui/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lgrammel/agent-tui.git",
+    "directory": "packages/agent-tui"
+  },
+  "type": "module",
+  "module": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "ai": "^5.1.0-beta.19"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

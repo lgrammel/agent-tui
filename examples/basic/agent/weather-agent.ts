@@ -1,4 +1,4 @@
-import { weatherTool } from "@/tool/weather-tool";
+import { weatherTool } from "../tool/weather-tool";
 import { Agent } from "ai";
 
 export const weatherAgent = new Agent({

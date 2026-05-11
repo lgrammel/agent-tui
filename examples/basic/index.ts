@@ -1,4 +1,4 @@
-import { AgentTUI } from "@/agent-tui";
+import { AgentTUI } from "@lgrammel/agent-tui";
 import type { Agent, ToolSet } from "ai";
 import { parseArgs } from "util";
 

@@ -1,38 +1,21 @@
 {
-  "name": "@lgrammel/agent-tui",
-  "version": "0.0.0",
-  "description": "Run AI SDK agents with Bun in a terminal.",
-  "homepage": "https://github.com/lgrammel/agent-tui#readme",
-  "bugs": {
-    "url": "https://github.com/lgrammel/agent-tui/issues"
-  },
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/lgrammel/agent-tui.git"
-  },
+  "name": "agent-tui-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "type": "module",
-  "module": "index.ts",
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "check": "bun run format:check && bun run lint",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",
-    "weather": "bun run index.ts --agent weather"
-  },
-  "dependencies": {
-    "ai": "^5.1.0-beta.19",
-    "zod": "^4"
+    "weather": "bun --cwd examples/basic run weather"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "oxfmt": "^0.48.0",
     "oxlint": "^1.63.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

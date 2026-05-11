@@ -1,0 +1,13 @@
+{
+  "name": "@lgrammel/agent-tui-basic-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "weather": "bun run index.ts --agent weather"
+  },
+  "dependencies": {
+    "@lgrammel/agent-tui": "workspace:*",
+    "ai": "^5.1.0-beta.19",
+    "zod": "^4"
+  }
+}

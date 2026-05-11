@@ -1,4 +1,4 @@
-import { printStream } from "@/util/print-stream";
+import { printStream } from "./util/print-stream";
 import type { Agent, StreamTextResult, ToolSet } from "ai";
 
 export type AgentTUIRenderer = {

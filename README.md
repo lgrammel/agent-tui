@@ -2,7 +2,8 @@
 
 Run AI SDK agents with Bun in a terminal.
 
-Contains an example weather agent.
+This repo is a Bun monorepo with the package in `packages/agent-tui` and a basic weather agent example in
+`examples/basic`.
 
 ## Setup
 
@@ -13,7 +14,7 @@ Contains an example weather agent.
 ## Example
 
 ```bash
-bun run index.ts --agent weather "what is the weather in london?"
+bun run weather "what is the weather in london?"
 ```
 
 ## Development
@@ -26,9 +27,9 @@ bun run check
 
 ## Folders
 
-- `@/agent`: contains agents
-- `@/tool`: contains tools
+- `packages/agent-tui`: contains the reusable terminal UI package
+- `examples/basic`: contains a weather agent example
 
 ## Usage
 
-You can add your own agent and tools.
+Import `AgentTUI` from `@lgrammel/agent-tui` and pass it an AI SDK agent.

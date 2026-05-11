@@ -3,14 +3,25 @@
   "workspaces": {
     "": {
       "name": "@lgrammel/agent-tui",
-      "dependencies": {
-        "ai": "^5.1.0-beta.19",
-        "zod": "^4",
-      },
       "devDependencies": {
         "@types/bun": "latest",
         "oxfmt": "^0.48.0",
         "oxlint": "^1.63.0",
+      },
+    },
+    "examples/basic": {
+      "name": "@lgrammel/agent-tui-basic-example",
+      "dependencies": {
+        "@lgrammel/agent-tui": "workspace:*",
+        "ai": "^5.1.0-beta.19",
+        "zod": "^4",
+      },
+    },
+    "packages/agent-tui": {
+      "name": "@lgrammel/agent-tui",
+      "version": "0.0.0",
+      "dependencies": {
+        "ai": "^5.1.0-beta.19",
       },
       "peerDependencies": {
         "typescript": "^5",
@@ -23,6 +34,10 @@
     "@ai-sdk/provider": ["@ai-sdk/provider@2.1.0-beta.4", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-GztNOfn3HvwWp7m2fqyzqVcMK7fxg5SOxZyplOwWHYVqnt1Oif7LUBuhmjyoziyVZmosZHlU4hYDWJ2UC2UU2w=="],
 
     "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@3.1.0-beta.6", "", { "dependencies": { "@ai-sdk/provider": "2.1.0-beta.4", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.5" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-SkZcgXzCXDMaFYnDJ+/bMqLlwxPCpBEO3Q+0yi4aGcTdU8C1rDlXSlU2LjXT54rqzG1eBS7y9xU2vgmRn65fpA=="],
+
+    "@lgrammel/agent-tui": ["@lgrammel/agent-tui@workspace:packages/agent-tui"],
+
+    "@lgrammel/agent-tui-basic-example": ["@lgrammel/agent-tui-basic-example@workspace:examples/basic"],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
 
