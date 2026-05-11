@@ -34,6 +34,21 @@ describe("renderScreen", () => {
     expect(output).toContain("┌ Chat ──────────────────────┐");
     expect(output).toContain("│ █ Hello                    │");
     expect(output).toContain("┌ Input ─────────────────────┐");
+    expect(output).toContain("│ > question█                │");
+  });
+
+  it("renders a blank cursor during the hidden blink phase", () => {
+    const output = renderScreen({
+      width: 30,
+      height: 8,
+      title: "Chat",
+      body: "Hello",
+      input: "question",
+      inputActive: true,
+      inputCursorVisible: false,
+      scrollOffset: 0,
+    });
+
     expect(output).toContain("│ > question                 │");
   });
 

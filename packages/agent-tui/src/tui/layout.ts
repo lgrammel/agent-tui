@@ -12,6 +12,7 @@ export type TUIScreenState = {
   body: string;
   input: string;
   inputActive: boolean;
+  inputCursorVisible?: boolean;
   scrollOffset: number;
   status?: string;
 };
@@ -41,7 +42,7 @@ export function renderScreen(state: TUIScreenState): string {
     topBorder(width, state.inputActive ? "Input" : "Status"),
     boxLine(
       state.inputActive
-        ? `> ${state.input}`
+        ? `> ${state.input}${state.inputCursorVisible === false ? " " : "█"}`
         : (state.status ?? "Streaming... ↑/↓ scroll · Ctrl+C quit"),
       width,
     ),

@@ -36,7 +36,7 @@ describe("TerminalRenderer", () => {
 
     await expect(promptPromise).resolves.toBe("hi");
     expect(stripAnsi(output.text())).toContain("┌ Input ");
-    expect(stripAnsi(output.text())).toContain("│ > hi");
+    expect(stripAnsi(output.text())).toContain("│ > hi█");
     expect(stripAnsi(output.text())).toContain("╭ User ");
   });
 
@@ -124,7 +124,7 @@ describe("TerminalRenderer", () => {
     input.emit("data", Buffer.from("\r"));
 
     await expect(promptPromise).resolves.toBe("next");
-    expect(stripAnsi(output.text())).toContain("│ > next");
+    expect(stripAnsi(output.text())).toContain("│ > next█");
   });
 });
 

@@ -72,6 +72,8 @@ const sectionStyles: Record<ChatSectionKind, { color: string; border: string }> 
   error: { color: colors.error, border: "─" },
 };
 
+const inputCursorBlinkMs = 500;
+
 export class TerminalRenderer {
   readonly #input: TerminalInput;
   readonly #output: TerminalOutput;
@@ -86,6 +88,8 @@ export class TerminalRenderer {
   #status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
   #isInteractive = false;
   #interrupted = false;
+  #inputCursorVisible = true;
+  #inputCursorTimer?: ReturnType<typeof setInterval>;
   #onData?: (chunk: Buffer) => void;
   #onResize?: () => void;
 
@@ -101,6 +105,7 @@ export class TerminalRenderer {
     this.#inputActive = true;
     this.#inputText = options?.initialPrompt ?? "";
     this.#status = "Type a prompt and press Enter · ↑/↓ scroll · Ctrl+C quit";
+    this.#startInputCursorBlink();
     this.#paint();
 
     return await new Promise((resolve, reject) => {
@@ -110,15 +115,18 @@ export class TerminalRenderer {
         switch (key.type) {
           case "character":
             this.#inputText += key.value;
+            this.#showInputCursor();
             this.#paint();
             break;
           case "backspace":
             this.#inputText = this.#inputText.slice(0, -1);
+            this.#showInputCursor();
             this.#paint();
             break;
           case "enter": {
             const prompt = this.#inputText;
             this.#inputActive = false;
+            this.#stopInputCursorBlink();
             this.#addUserSection(prompt);
             this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
             this.#inputText = "";
@@ -132,6 +140,7 @@ export class TerminalRenderer {
             this.#handleScroll(key.type);
             break;
           case "ctrl-c":
+            this.#stopInputCursorBlink();
             this.#stop();
             reject(interruptedError());
             break;
@@ -214,6 +223,7 @@ export class TerminalRenderer {
 
   #stop() {
     this.#detachInput();
+    this.#stopInputCursorBlink();
 
     if (!this.#isInteractive) {
       return;
@@ -273,6 +283,29 @@ export class TerminalRenderer {
       this.#width(),
     );
     this.#paint();
+  }
+
+  #startInputCursorBlink() {
+    this.#stopInputCursorBlink();
+    this.#showInputCursor();
+    this.#inputCursorTimer = setInterval(() => {
+      this.#inputCursorVisible = !this.#inputCursorVisible;
+      this.#paint();
+    }, inputCursorBlinkMs);
+    this.#inputCursorTimer.unref?.();
+  }
+
+  #stopInputCursorBlink() {
+    if (this.#inputCursorTimer) {
+      clearInterval(this.#inputCursorTimer);
+      this.#inputCursorTimer = undefined;
+    }
+
+    this.#inputCursorVisible = true;
+  }
+
+  #showInputCursor() {
+    this.#inputCursorVisible = true;
   }
 
   #addSubmittedPrompt(prompt: string | undefined) {
@@ -402,6 +435,7 @@ export class TerminalRenderer {
       body: this.#body() || "Waiting for input...",
       input: this.#inputText,
       inputActive: this.#inputActive,
+      inputCursorVisible: this.#inputCursorVisible,
       scrollOffset: this.#scrollOffset,
       status: this.#status,
     });
