@@ -1,6 +1,6 @@
 {
   "name": "@lgrammel/agent-tui",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Run AI SDK agents in a terminal UI.",
   "homepage": "https://github.com/lgrammel/agent-tui#readme",
   "bugs": {
@@ -12,6 +12,11 @@
     "url": "git+https://github.com/lgrammel/agent-tui.git",
     "directory": "packages/agent-tui"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -22,11 +27,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --tsconfig tsconfig.build.json",
     "prepack": "bun run prepare:publish && bun run build",
@@ -34,9 +37,6 @@
     "pack:dry-run": "npm pack --dry-run",
     "release:dry-run": "bun run pack:dry-run",
     "release": "npm publish"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "dependencies": {
     "ai": "^7.0.0-canary.130"
