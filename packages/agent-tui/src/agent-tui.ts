@@ -1,5 +1,5 @@
 import { TerminalRenderer } from "./tui/terminal-renderer";
-import type { TextStreamPart, ToolSet } from "ai";
+import type { Agent, TextStreamPart, ToolSet } from "ai";
 
 export type AgentTUIStreamPart = TextStreamPart<ToolSet>;
 
@@ -13,13 +13,14 @@ export type AgentTUIMessage = {
 };
 
 export type AgentTUIStreamOptions = {
-  prompt: string;
   messages: AgentTUIMessage[];
 };
 
-export type AgentTUIAgent = {
-  stream(options: AgentTUIStreamOptions): Promise<AgentTUIStreamResult> | AgentTUIStreamResult;
-};
+export type AgentTUIAgent =
+  | Agent
+  | {
+    stream(options: AgentTUIStreamOptions): Promise<AgentTUIStreamResult> | AgentTUIStreamResult;
+  };
 
 export type AgentTUIRenderer = {
   readPrompt?(options?: AgentTUISessionOptions): Promise<string | undefined>;
@@ -89,7 +90,6 @@ export class AgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent> {
       hasRunTurn = true;
 
       const result = await this.#agent.stream({
-        prompt,
         messages: [...messages],
       });
       const responseParts: string[] = [];

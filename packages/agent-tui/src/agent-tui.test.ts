@@ -19,7 +19,6 @@ describe("AgentTUI", () => {
 
     expect(streamCalls).toEqual([
       {
-        prompt: "hello",
         messages: [{ role: "user", content: "hello" }],
       },
     ]);
@@ -36,15 +35,36 @@ describe("AgentTUI", () => {
 
     expect(streamCalls).toEqual([
       {
-        prompt: "first",
         messages: [{ role: "user", content: "first" }],
       },
       {
-        prompt: "second",
         messages: [
           { role: "user", content: "first" },
           { role: "assistant", content: "response to first" },
           { role: "user", content: "second" },
+        ],
+      },
+    ]);
+  });
+
+  it("collects assistant text after tool calls in a multi-step stream", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    const renderer = createRenderer({
+      prompts: ["next", undefined],
+    });
+    const agent = createMultiStepAgent(streamCalls);
+
+    await new AgentTUI(agent, { renderer }).run({ prompt: "weather" });
+
+    expect(streamCalls).toEqual([
+      {
+        messages: [{ role: "user", content: "weather" }],
+      },
+      {
+        messages: [
+          { role: "user", content: "weather" },
+          { role: "assistant", content: "Berlin is snowy and 72F." },
+          { role: "user", content: "next" },
         ],
       },
     ]);
@@ -70,11 +90,23 @@ describe("AgentTUI", () => {
 
 function createAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
   return {
-    stream(options) {
+    stream(options: AgentTUIStreamOptions) {
       streamCalls.push(options);
 
       return {
-        fullStream: createStream(`response to ${options.prompt}`),
+        fullStream: createStream(`response to ${lastUserMessage(options).content}`),
+      };
+    },
+  };
+}
+
+function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
+  return {
+    stream(options: AgentTUIStreamOptions) {
+      streamCalls.push(options);
+
+      return {
+        fullStream: createMultiStepStream(),
       };
     },
   };
@@ -97,6 +129,35 @@ function createRenderer(options: { prompts: Array<string | undefined> }): AgentT
 
 function createStream(text: string): AsyncIterable<AgentTUIStreamPart> {
   return (async function* () {
-    yield { type: "text-delta", text };
+    yield { type: "text-delta", id: "text-1", text };
+  })();
+}
+
+function lastUserMessage(options: AgentTUIStreamOptions) {
+  const message = options.messages.findLast((message) => message.role === "user");
+
+  if (!message) {
+    throw new Error("Expected at least one user message.");
+  }
+
+  return message;
+}
+
+function createMultiStepStream(): AsyncIterable<AgentTUIStreamPart> {
+  return (async function* () {
+    yield {
+      type: "tool-call",
+      toolCallId: "call-1",
+      toolName: "weather",
+      input: { city: "Berlin" },
+    } as AgentTUIStreamPart;
+    yield {
+      type: "tool-result",
+      toolCallId: "call-1",
+      toolName: "weather",
+      input: { city: "Berlin" },
+      output: { city: "Berlin", temperature: 72, weather: "snowy" },
+    } as AgentTUIStreamPart;
+    yield { type: "text-delta", id: "text-1", text: "Berlin is snowy and 72F." };
   })();
 }
