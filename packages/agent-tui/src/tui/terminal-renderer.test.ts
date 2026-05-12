@@ -46,13 +46,13 @@ describe("TerminalRenderer", () => {
     const output = createOutput();
     const renderer = new TerminalRenderer({ input, output });
 
-    await renderer.renderStream(createStream(["# Hello", "\n- there"]) as never, {
+    await renderer.renderStream(createStream(["# Hello", "\n- there"], { outputTokens: 12 }) as never, {
       title: "Test",
       waitForExit: false,
     });
 
     expect(output.text()).toContain("\x1b[92m╭ Assistant ");
-    expect(stripAnsi(output.text())).toContain("│ ╭ Assistant ");
+    expect(stripAnsi(output.text())).toContain("12 tokens");
     expect(stripAnsi(output.text())).toContain("│ │ █ Hello");
     expect(stripAnsi(output.text())).toContain("│ │ • there");
     expect(input.rawModes).toEqual([true, false]);
@@ -202,7 +202,7 @@ function createOutput() {
   return output;
 }
 
-function createStream(chunks: string[]): AgentTUIStreamResult {
+function createStream(chunks: string[], usage?: { outputTokens: number }): AgentTUIStreamResult {
   return {
     uiMessageStream: (async function* () {
       yield { type: "start", messageId: "message-1" };
@@ -211,7 +211,7 @@ function createStream(chunks: string[]): AgentTUIStreamResult {
         yield { type: "text-delta", id: "text-1", delta: text };
       }
       yield { type: "text-end", id: "text-1" };
-      yield { type: "finish" };
+      yield { type: "finish", usage };
     })(),
   };
 }

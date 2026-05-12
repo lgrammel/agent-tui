@@ -62,8 +62,18 @@ type ChatSectionKind = "user" | "assistant" | "reasoning" | "tool" | "error";
 type ChatSection = {
   kind: ChatSectionKind;
   title: string;
+  rightTitle?: string;
   content: string;
   id?: string;
+};
+
+type StreamUsage = {
+  outputTokens?: number | { total?: number };
+  completionTokens?: number;
+};
+
+type MessageMetadataWithUsage = {
+  usage?: StreamUsage;
 };
 
 const colors = {
@@ -99,6 +109,7 @@ export class TerminalRenderer {
   #status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
   #isInteractive = false;
   #interrupted = false;
+  #assistantOutputTokens?: number;
   #inputCursorVisible = true;
   #inputCursorTimer?: ReturnType<typeof setInterval>;
   #onData?: (chunk: Buffer) => void;
@@ -175,6 +186,7 @@ export class TerminalRenderer {
     this.#inputActive = false;
     this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
     this.#interrupted = false;
+    this.#assistantOutputTokens = undefined;
     this.#paint();
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
     this.#attachInput();
@@ -191,6 +203,10 @@ export class TerminalRenderer {
 
         responseMessage = message;
         this.#renderAssistantMessage(message);
+      }
+
+      if (!this.#interrupted && responseMessage && this.#assistantOutputTokens != null) {
+        this.#renderAssistantMessage(responseMessage);
       }
     } finally {
       this.#detachInput();
@@ -345,6 +361,8 @@ export class TerminalRenderer {
 
   #renderAssistantMessage(message: UIMessage) {
     const activeSectionIds = new Set<string>();
+    this.#assistantOutputTokens =
+      extractOutputTokenCountFromMetadata(message.metadata) ?? this.#assistantOutputTokens;
 
     for (const [index, part] of message.parts.entries()) {
       const id = sectionId(message.id, index);
@@ -356,6 +374,7 @@ export class TerminalRenderer {
             id,
             kind: "assistant",
             title: "Assistant",
+            rightTitle: formatTokenCount(this.#assistantOutputTokens),
             content: part.text,
           });
           break;
@@ -392,6 +411,7 @@ export class TerminalRenderer {
     if (existingSection) {
       existingSection.kind = section.kind;
       existingSection.title = section.title;
+      existingSection.rightTitle = section.rightTitle;
       existingSection.content = section.content;
       return;
     }
@@ -413,6 +433,10 @@ export class TerminalRenderer {
     for await (const chunk of iterateUIMessageStream(stream)) {
       if (chunk.type === "error") {
         this.#addErrorSection("Error", chunk.errorText);
+      }
+
+      if (chunk.type === "finish") {
+        this.#assistantOutputTokens = extractOutputTokenCount(chunk);
       }
 
       yield chunk;
@@ -643,7 +667,9 @@ function renderSection(section: ChatSection, width: number) {
   const style = sectionStyles[section.kind];
   const contentWidth = Math.max(1, width - 4);
   const title = ` ${section.title} `;
-  const top = `${style.color}╭${title}${style.border.repeat(Math.max(0, width - 2 - title.length))}╮${colors.reset}`;
+  const rightTitle = section.rightTitle ? ` ${section.rightTitle} ` : "";
+  const borderWidth = Math.max(0, width - 2 - title.length - rightTitle.length);
+  const top = `${style.color}╭${title}${style.border.repeat(borderWidth)}${rightTitle}╮${colors.reset}`;
   const bottom = `${style.color}╰${style.border.repeat(Math.max(0, width - 2))}╯${colors.reset}`;
   const content =
     section.content.length > 0
@@ -690,6 +716,42 @@ function findVisibleBreakPoint(input: string, width: number) {
   }
 
   return sliceVisible(input, width).length;
+}
+
+function extractOutputTokenCount(chunk: UIMessageChunk) {
+  const usage = "usage" in chunk ? (chunk.usage as StreamUsage | undefined) : undefined;
+  const metadataUsage =
+    "messageMetadata" in chunk
+      ? (chunk.messageMetadata as MessageMetadataWithUsage | undefined)?.usage
+      : undefined;
+
+  return extractOutputTokenCountFromUsage(usage ?? metadataUsage);
+}
+
+function extractOutputTokenCountFromMetadata(metadata: unknown) {
+  return extractOutputTokenCountFromUsage((metadata as MessageMetadataWithUsage | undefined)?.usage);
+}
+
+function extractOutputTokenCountFromUsage(usage: StreamUsage | undefined) {
+  const outputTokens = usage?.outputTokens;
+
+  if (typeof outputTokens === "number") {
+    return outputTokens;
+  }
+
+  if (typeof outputTokens?.total === "number") {
+    return outputTokens.total;
+  }
+
+  return usage?.completionTokens;
+}
+
+function formatTokenCount(tokens: number | undefined) {
+  if (tokens == null) {
+    return undefined;
+  }
+
+  return `${tokens.toLocaleString()} ${tokens === 1 ? "token" : "tokens"}`;
 }
 
 export function parseKey(chunk: Buffer): TerminalKey {

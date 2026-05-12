@@ -21,6 +21,7 @@ type AgentTUITextStreamResult = {
   toUIMessageStream?: (options?: {
     originalMessages?: UIMessage[];
     generateMessageId?: () => string;
+    messageMetadata?: (options: { part: TextStreamPart<ToolSet> }) => unknown;
   }) => AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
 };
 
@@ -165,6 +166,7 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           agent: this.#agent,
           uiMessages: messages,
           generateMessageId,
+          messageMetadata: createMessageMetadata,
         }),
       };
     }
@@ -202,6 +204,7 @@ function normalizeStreamResult(
       uiMessageStream: result.toUIMessageStream({
         originalMessages,
         generateMessageId,
+        messageMetadata: createMessageMetadata,
       }),
     };
   }
@@ -390,7 +393,11 @@ async function* textStreamToUIMessageStream(
       case "finish":
         yield* closeOpenParts(openTextParts, openReasoningParts);
         sentFinish = true;
-        yield { type: "finish", finishReason: part.finishReason };
+        yield {
+          type: "finish",
+          finishReason: part.finishReason,
+          messageMetadata: createUsageMetadata(part.totalUsage.outputTokens),
+        };
         break;
       case "abort":
         yield { type: "abort", reason: part.reason };
@@ -405,6 +412,20 @@ async function* textStreamToUIMessageStream(
     yield* closeOpenParts(openTextParts, openReasoningParts);
     yield { type: "finish" };
   }
+}
+
+function createUsageMetadata(outputTokens: number | undefined) {
+  return outputTokens == null ? undefined : { usage: { outputTokens } };
+}
+
+function createMessageMetadata(options: { part: TextStreamPart<ToolSet> }) {
+  const { part } = options;
+
+  if (part.type !== "finish") {
+    return undefined;
+  }
+
+  return createUsageMetadata(part.totalUsage.outputTokens);
 }
 
 function* closeOpenParts(textPartIds: Set<string>, reasoningPartIds: Set<string>) {
