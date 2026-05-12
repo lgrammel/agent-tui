@@ -142,6 +142,10 @@ export class MockScreen extends EventEmitter implements TerminalOutput {
       const character = input[index];
       index += 1;
 
+      if (character === undefined) {
+        continue;
+      }
+
       if (character === "\n") {
         this.#cursorLine += 1;
         this.#cursorColumn = 0;
