@@ -645,42 +645,49 @@ function renderToolInvocation(
       return {
         kind: "tool",
         title,
-        content: `Status: input streaming\n${inputText}`,
+        rightTitle: status,
+        content: inputText,
       };
     case "input-available":
       return {
         kind: "tool",
         title,
-        content: `Status: running\n${inputText}`,
+        rightTitle: status,
+        content: inputText,
       };
     case "approval-requested":
       return {
         kind: "tool",
         title,
-        content: `Status: awaiting approval\n${inputText}`,
+        rightTitle: status,
+        content: inputText,
       };
     case "approval-responded":
       return {
         kind: "tool",
         title,
-        content: `Status: ${part.approval.approved ? "approved" : "denied"}\n${inputText}`,
+        rightTitle: status,
+        content: inputText,
       };
     case "output-available":
       return {
         kind: "tool",
         title,
+        rightTitle: status,
         content: `${inputText}\n\nOutput:\n${formatValue(part.output)}`,
       };
     case "output-error":
       return {
         kind: "error",
         title: `Tool Error · ${part.title ?? toolName}`,
+        rightTitle: status,
         content: `${inputText}\n\nError:\n${part.errorText}`,
       };
     case "output-denied":
       return {
         kind: "error",
         title: `Tool Denied · ${part.title ?? toolName}`,
+        rightTitle: status,
         content: `${inputText}\n\nReason: ${part.approval.reason ?? "denied"}`,
       };
   }
@@ -689,15 +696,18 @@ function renderToolInvocation(
 function toolStatus(part: ToolUIPart | DynamicToolUIPart) {
   switch (part.state) {
     case "input-streaming":
-    case "approval-requested":
       return "waiting";
+    case "approval-requested":
+      return "approval requested";
     case "input-available":
-    case "approval-responded":
       return "executing";
+    case "approval-responded":
+      return part.approval.approved ? "executing" : "denied";
     case "output-available":
     case "output-error":
-    case "output-denied":
       return "done";
+    case "output-denied":
+      return "denied";
   }
 }
 

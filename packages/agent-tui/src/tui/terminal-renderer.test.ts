@@ -102,10 +102,31 @@ describe("TerminalRenderer", () => {
 
     expect(output.text()).toContain("\x1b[94m╭ Reasoning ");
     expect(output.text()).toContain("\x1b[95m╭ Tool · weather ");
+    expect(stripAnsi(output.text())).toMatch(/╭ Tool · weather ─+ executing ╮/);
+    expect(stripAnsi(output.text())).toMatch(/╭ Tool · weather ─+ done ╮/);
     expect(stripAnsi(output.text())).toContain("thinking");
     expect(stripAnsi(output.text())).toContain("Input:");
     expect(stripAnsi(output.text())).toContain("Output:");
     expect(stripAnsi(output.text())).toContain('"weather": "sunny"');
+  });
+
+  it("renders tool approval statuses in the tool header", async () => {
+    const input = createInput();
+    const output = createOutput();
+    output.columns = 64;
+    output.rows = 20;
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(createToolApprovalStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).toMatch(/╭ Tool · shell ─+ waiting ╮/);
+    expect(rendered).toMatch(/╭ Tool · shell ─+ approval requested ╮/);
+    expect(rendered).toMatch(/╭ Tool · shell ─+ denied ╮/);
   });
 
   it("collapses tool parts to an empty box with name and status", async () => {
@@ -314,6 +335,37 @@ function createMixedStream(): AgentTUIStreamResult {
         type: "tool-output-available",
         toolCallId: "call-1",
         output: { city: "Berlin", weather: "sunny" },
+      } satisfies UIMessageChunk;
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createToolApprovalStream(): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield {
+        type: "tool-input-start",
+        toolCallId: "call-1",
+        toolName: "shell",
+      } satisfies UIMessageChunk;
+      yield {
+        type: "tool-input-available",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+      } satisfies UIMessageChunk;
+      yield {
+        type: "tool-approval-request",
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+      } satisfies UIMessageChunk;
+      yield {
+        type: "tool-approval-response",
+        approvalId: "approval-1",
+        approved: false,
+        reason: "Denied by user.",
       } satisfies UIMessageChunk;
       yield { type: "finish" };
     })(),
