@@ -10,6 +10,19 @@ import { stripAnsi } from "./layout";
 import type { AgentTUIStreamResult } from "../agent-tui-runner";
 import type { UIMessageChunk } from "ai";
 
+type TestInput = TerminalInput &
+  EventEmitter & {
+    rawModes: boolean[];
+    resumeCalls: number;
+    pauseCalls: number;
+  };
+
+type TestOutput = TerminalOutput &
+  EventEmitter & {
+    chunks: string[];
+    text: () => string;
+  };
+
 describe("parseKey", () => {
   it("decodes terminal control keys", () => {
     expect(parseKey(Buffer.from("\x1B[A"))).toEqual({ type: "up" });
@@ -46,10 +59,13 @@ describe("TerminalRenderer", () => {
     const output = createOutput();
     const renderer = new TerminalRenderer({ input, output });
 
-    await renderer.renderStream(createStream(["# Hello", "\n- there"], { outputTokens: 12 }) as never, {
-      title: "Test",
-      waitForExit: false,
-    });
+    await renderer.renderStream(
+      createStream(["# Hello", "\n- there"], { outputTokens: 12 }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
 
     expect(output.text()).toContain("\x1b[92m╭ Assistant ");
     expect(stripAnsi(output.text())).toContain("12 tokens");
@@ -126,6 +142,55 @@ describe("TerminalRenderer", () => {
     expect(output.text()).toContain("Bad API key");
   });
 
+  it("reads tool approval decisions from the status prompt", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+    const approvalPromise = renderer.readToolApproval(
+      {
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+        messageId: "message-1",
+        partIndex: 0,
+      },
+      { title: "Test" },
+    );
+
+    expect(stripAnsi(output.text())).toContain("Approve tool shell? y/n");
+
+    input.emit("data", Buffer.from("y"));
+
+    await expect(approvalPromise).resolves.toEqual({ approved: true });
+    expect(stripAnsi(output.text())).toContain("Approved");
+  });
+
+  it("denies tool approval decisions from the status prompt", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+    const approvalPromise = renderer.readToolApproval(
+      {
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+        messageId: "message-1",
+        partIndex: 0,
+      },
+      { title: "Test" },
+    );
+
+    input.emit("data", Buffer.from("n"));
+
+    await expect(approvalPromise).resolves.toEqual({
+      approved: false,
+      reason: "Denied by user.",
+    });
+    expect(stripAnsi(output.text())).toContain("Denied");
+  });
+
   it("keeps the terminal session open between turns", async () => {
     const input = createInput();
     const output = createOutput();
@@ -180,11 +245,7 @@ describe("TerminalRenderer", () => {
 });
 
 function createInput() {
-  const input = new EventEmitter() as TerminalInput & {
-    rawModes: boolean[];
-    resumeCalls: number;
-    pauseCalls: number;
-  };
+  const input = new EventEmitter() as TestInput;
 
   input.isTTY = true;
   input.rawModes = [];
@@ -208,7 +269,7 @@ function createInput() {
 
 function createOutput() {
   const chunks: string[] = [];
-  const output = new EventEmitter() as TerminalOutput & { chunks: string[]; text: () => string };
+  const output = new EventEmitter() as TestOutput;
 
   output.columns = 40;
   output.rows = 10;

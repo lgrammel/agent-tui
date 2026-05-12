@@ -1,4 +1,8 @@
-import type { AgentTUIStreamResult } from "../agent-tui-runner";
+import type {
+  AgentTUIStreamResult,
+  AgentTUIToolApprovalRequest,
+  AgentTUIToolApprovalResponse,
+} from "../agent-tui-runner";
 import { clampScrollOffset, renderScreen, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
 import { TerminalFrameBuffer } from "./terminal-frame-buffer";
@@ -200,6 +204,7 @@ export class TerminalRenderer {
 
     try {
       for await (const message of readUIMessageStream({
+        message: result.message,
         stream: toReadableStream(this.#observeUIMessageStream(result.uiMessageStream)),
         onError: (error) => this.#addErrorSection("Error", formatStreamError(error)),
       })) {
@@ -234,6 +239,58 @@ export class TerminalRenderer {
     }
 
     return responseMessage;
+  }
+
+  async readToolApproval(
+    request: AgentTUIToolApprovalRequest,
+    options?: TerminalSessionOptions,
+  ): Promise<AgentTUIToolApprovalResponse> {
+    this.#start(options);
+    this.#inputActive = false;
+    this.#status = `Approve ${formatToolApprovalTitle(request)}? y/n · ↑/↓ scroll · Ctrl+C quit`;
+    this.#interrupted = false;
+    this.#paint();
+
+    return await new Promise((resolve, reject) => {
+      this.#onData = (chunk) => {
+        const key = parseKey(chunk);
+
+        switch (key.type) {
+          case "character": {
+            const value = key.value.toLowerCase();
+
+            if (value === "y") {
+              this.#status = "Approved · Streaming... ↑/↓ scroll · Ctrl+C quit";
+              this.#detachInput();
+              this.#paint();
+              resolve({ approved: true });
+            } else if (value === "n") {
+              this.#status = "Denied · Streaming... ↑/↓ scroll · Ctrl+C quit";
+              this.#detachInput();
+              this.#paint();
+              resolve({ approved: false, reason: "Denied by user." });
+            }
+            break;
+          }
+          case "up":
+          case "down":
+            this.#handleScroll(key.type);
+            break;
+          case "ctrl-r":
+            this.#repaint();
+            break;
+          case "ctrl-c":
+            this.#interrupted = true;
+            this.#stop();
+            reject(interruptedError());
+            break;
+          default:
+            break;
+        }
+      };
+
+      this.#attachInput();
+    });
   }
 
   #start(options?: TerminalSessionOptions) {
@@ -652,6 +709,10 @@ function formatValue(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+function formatToolApprovalTitle(request: AgentTUIToolApprovalRequest) {
+  return `tool ${request.title ?? request.toolName}`;
+}
+
 function sectionId(messageId: string, partIndex: number) {
   return `${messageId}:${partIndex}`;
 }
@@ -778,7 +839,9 @@ function extractOutputTokenCount(chunk: UIMessageChunk) {
 }
 
 function extractOutputTokenCountFromMetadata(metadata: unknown) {
-  return extractOutputTokenCountFromUsage((metadata as MessageMetadataWithUsage | undefined)?.usage);
+  return extractOutputTokenCountFromUsage(
+    (metadata as MessageMetadataWithUsage | undefined)?.usage,
+  );
 }
 
 function extractOutputTokenCountFromUsage(usage: StreamUsage | undefined) {

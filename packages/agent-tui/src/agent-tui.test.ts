@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentTUIAgent, AgentTUIRenderer, AgentTUIStreamOptions } from "./agent-tui-runner";
+import type {
+  AgentTUIAgent,
+  AgentTUIRenderer,
+  AgentTUIStreamOptions,
+  AgentTUIToolApprovalRequest,
+  AgentTUIToolApprovalResponse,
+} from "./agent-tui-runner";
 
 let testRenderer: AgentTUIRenderer | undefined;
 let terminalRendererOptions: unknown[] = [];
@@ -136,6 +142,42 @@ describe("AgentTUIRunner", () => {
     ]);
   });
 
+  it("continues the turn with a tool approval response", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["run command", undefined],
+        toolApprovals: [{ approved: true }],
+      }),
+    );
+    const agent = createApprovalAgent(streamCalls);
+
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
+
+    expect(streamCalls).toEqual([
+      {
+        messages: [createUserMessage("message-1", "run command")],
+      },
+      {
+        messages: [
+          createUserMessage("message-1", "run command"),
+          createAssistantMessageWithToolApproval("message-2", true),
+        ],
+      },
+    ]);
+    expect(renderer.toolApprovalRequests).toEqual([
+      expect.objectContaining({
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+        messageId: "message-2",
+        partIndex: 0,
+      }),
+    ]);
+    expect(renderer.submittedPrompts).toEqual(["run command"]);
+  });
+
   it("exits when prompt input is interrupted", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     useRenderer({
@@ -211,11 +253,28 @@ function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAge
   };
 }
 
+function createApprovalAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
+  return {
+    stream(options: AgentTUIStreamOptions) {
+      streamCalls.push(options);
+
+      return {
+        fullStream:
+          streamCalls.length === 1 ? createApprovalRequestStream() : createApprovalResponseStream(),
+      };
+    },
+  };
+}
+
 function createAISDKAgent(): Agent<any, any, any, any> {
   return { version: "agent-v1" } as Agent<any, any, any, any>;
 }
 
-type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[]; titles: string[] };
+type TestRenderer = AgentTUIRenderer & {
+  submittedPrompts: string[];
+  titles: string[];
+  toolApprovalRequests: AgentTUIToolApprovalRequest[];
+};
 
 function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): TRenderer {
   testRenderer = renderer;
@@ -223,19 +282,38 @@ function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): T
   return renderer;
 }
 
-function createRenderer(options: { prompts: Array<string | undefined> }): TestRenderer {
+function createRenderer(options: {
+  prompts: Array<string | undefined>;
+  toolApprovals?: AgentTUIToolApprovalResponse[];
+}): TestRenderer {
   const submittedPrompts: string[] = [];
   const titles: string[] = [];
+  const toolApprovalRequests: AgentTUIToolApprovalRequest[] = [];
 
   return {
     submittedPrompts,
     titles,
+    toolApprovalRequests,
     async readPrompt(sessionOptions) {
       if (sessionOptions?.title) {
         titles.push(sessionOptions.title);
       }
 
       return options.prompts.shift();
+    },
+    async readToolApproval(request, sessionOptions) {
+      if (sessionOptions?.title) {
+        titles.push(sessionOptions.title);
+      }
+
+      toolApprovalRequests.push(request);
+
+      const approval = options.toolApprovals?.shift();
+      if (!approval) {
+        throw new Error("Expected a test tool approval.");
+      }
+
+      return approval;
     },
     async renderStream(result, sessionOptions) {
       if (sessionOptions?.title) {
@@ -315,6 +393,22 @@ function createAssistantMessageWithToolInvocation(id: string): UIMessage {
   };
 }
 
+function createAssistantMessageWithToolApproval(id: string, approved: boolean): UIMessage {
+  return {
+    id,
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-shell",
+        toolCallId: "call-1",
+        state: "approval-responded",
+        input: { command: "date" },
+        approval: { id: "approval-1", approved },
+      },
+    ],
+  };
+}
+
 function toReadableStream(
   stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
 ): ReadableStream<UIMessageChunk> {
@@ -348,5 +442,44 @@ function createMultiStepStream(): AsyncIterable<TextStreamPart<ToolSet>> {
       output: { city: "Berlin", temperature: 72, weather: "snowy" },
     } as TextStreamPart<ToolSet>;
     yield { type: "text-delta", id: "text-1", text: "Berlin is snowy and 72F." };
+  })();
+}
+
+function createApprovalRequestStream(): AsyncIterable<TextStreamPart<ToolSet>> {
+  return (async function* () {
+    yield {
+      type: "tool-approval-request",
+      approvalId: "approval-1",
+      toolCall: {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+      },
+    } as TextStreamPart<ToolSet>;
+  })();
+}
+
+function createApprovalResponseStream(): AsyncIterable<TextStreamPart<ToolSet>> {
+  return (async function* () {
+    yield {
+      type: "tool-approval-response",
+      approvalId: "approval-1",
+      toolCall: {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "shell",
+        input: { command: "date" },
+      },
+      approved: true,
+    } as TextStreamPart<ToolSet>;
+    yield {
+      type: "tool-result",
+      toolCallId: "call-1",
+      toolName: "shell",
+      input: { command: "date" },
+      output: "ok",
+    } as TextStreamPart<ToolSet>;
+    yield { type: "text-delta", id: "text-1", text: "command approved" };
   })();
 }

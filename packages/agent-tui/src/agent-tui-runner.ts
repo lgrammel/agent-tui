@@ -1,8 +1,11 @@
 import type { RunAgentTUIOptions } from "./run-agent-tui";
 import { TerminalRenderer, type TerminalInput, type TerminalOutput } from "./tui/terminal-renderer";
 import {
-  createAgentUIStream,
+  convertToModelMessages,
   type Agent,
+  getToolName,
+  isToolUIPart,
+  type ModelMessage,
   type TextStreamPart,
   type ToolSet,
   type UIMessage,
@@ -13,10 +16,16 @@ type AISDKAgent = Agent<any, any, any, any>;
 
 export type AgentTUIStreamResult = {
   uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
+  message?: UIMessage;
 };
 
 export type AgentTUIStreamOptions = {
   messages: UIMessage[];
+};
+
+type AgentTUIAISDKStreamOptions = {
+  prompt: ModelMessage[];
+  options: unknown;
 };
 
 type AgentTUITextStreamResult = {
@@ -47,8 +56,28 @@ export type AgentTUISessionOptions = {
   collapseTools?: boolean;
 };
 
+export type AgentTUIToolApprovalRequest = {
+  approvalId: string;
+  toolCallId: string;
+  toolName: string;
+  title?: string;
+  input: unknown;
+  providerExecuted?: boolean;
+  messageId: string;
+  partIndex: number;
+};
+
+export type AgentTUIToolApprovalResponse = {
+  approved: boolean;
+  reason?: string;
+};
+
 export type AgentTUIRenderer = {
   readPrompt?(options?: AgentTUISessionOptions): Promise<string | undefined>;
+  readToolApproval?(
+    request: AgentTUIToolApprovalRequest,
+    options?: AgentTUISessionOptions,
+  ): Promise<AgentTUIToolApprovalResponse>;
   renderStream(
     result: AgentTUIStreamResult,
     options?: AgentTUISessionOptions,
@@ -85,34 +114,39 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     const generateMessageId = () => `message-${++nextMessageIndex}`;
     let prompt: string | undefined;
     let hasRunTurn = false;
+    let streamWithoutPrompt = false;
 
     while (true) {
-      if (prompt == null) {
-        if (!this.#renderer.readPrompt) {
-          if (hasRunTurn) {
-            return;
-          }
-
-          throw new Error("No prompt was provided and the renderer does not support prompt input.");
-        }
-
-        try {
-          prompt = await this.#renderer.readPrompt({ title });
-        } catch (error) {
-          if (isInterruptedError(error)) {
-            return;
-          }
-
-          throw error;
-        }
-
+      if (!streamWithoutPrompt) {
         if (prompt == null) {
-          return;
-        }
-      }
+          if (!this.#renderer.readPrompt) {
+            if (hasRunTurn) {
+              return;
+            }
 
-      messages.push(createUserMessage(generateMessageId(), prompt));
-      hasRunTurn = true;
+            throw new Error(
+              "No prompt was provided and the renderer does not support prompt input.",
+            );
+          }
+
+          try {
+            prompt = await this.#renderer.readPrompt({ title });
+          } catch (error) {
+            if (isInterruptedError(error)) {
+              return;
+            }
+
+            throw error;
+          }
+
+          if (prompt == null) {
+            return;
+          }
+        }
+
+        messages.push(createUserMessage(generateMessageId(), prompt));
+        hasRunTurn = true;
+      }
 
       const result = await this.#streamMessages([...messages], generateMessageId);
 
@@ -126,7 +160,27 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
         });
 
         if (responseMessage && responseMessage.parts.length > 0) {
-          messages.push(responseMessage);
+          const approvalRequests = findPendingToolApprovalRequests(responseMessage);
+
+          if (approvalRequests.length > 0) {
+            if (!this.#renderer.readToolApproval) {
+              throw new Error(
+                "Tool approval was requested, but the renderer does not support tool approval input.",
+              );
+            }
+
+            for (const request of approvalRequests) {
+              const response = await this.#renderer.readToolApproval(request, { title });
+              applyToolApprovalResponse(responseMessage, request, response);
+            }
+
+            upsertResponseMessage(messages, responseMessage, streamWithoutPrompt);
+            streamWithoutPrompt = true;
+            prompt = undefined;
+            continue;
+          }
+
+          upsertResponseMessage(messages, responseMessage, streamWithoutPrompt);
         }
       } catch (error) {
         if (isInterruptedError(error)) {
@@ -135,6 +189,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 
         throw error;
       }
+      streamWithoutPrompt = false;
       prompt = undefined;
     }
   }
@@ -144,13 +199,18 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     generateMessageId: () => string,
   ): Promise<AgentTUIStreamResult> {
     if (isAISDKAgent(this.#agent)) {
+      const result = await this.#agent.stream({
+        prompt: await convertToModelMessages(messages, { tools: this.#agent.tools }),
+        options: undefined,
+      } as AgentTUIAISDKStreamOptions);
+
       return {
-        uiMessageStream: await createAgentUIStream({
-          agent: this.#agent,
-          uiMessages: messages,
+        uiMessageStream: textStreamToUIMessageStream(
+          result.fullStream,
           generateMessageId,
-          messageMetadata: createMessageMetadata,
-        }),
+          messages,
+        ),
+        message: lastAssistantMessage(messages),
       };
     }
 
@@ -187,8 +247,10 @@ function normalizeStreamResult(
   originalMessages: UIMessage[],
   generateMessageId: () => string,
 ): AgentTUIStreamResult {
+  const message = lastAssistantMessage(originalMessages);
+
   if ("uiMessageStream" in result) {
-    return result;
+    return { ...result, message };
   }
 
   if (result.toUIMessageStream) {
@@ -198,23 +260,34 @@ function normalizeStreamResult(
         generateMessageId,
         messageMetadata: createMessageMetadata,
       }),
+      message,
     };
   }
 
   return {
-    uiMessageStream: textStreamToUIMessageStream(result.fullStream, generateMessageId),
+    uiMessageStream: textStreamToUIMessageStream(
+      result.fullStream,
+      generateMessageId,
+      originalMessages,
+    ),
+    message,
   };
 }
 
 async function* textStreamToUIMessageStream(
   stream: AsyncIterable<TextStreamPart<ToolSet>>,
   generateMessageId: () => string,
+  originalMessages: UIMessage[] = [],
 ): AsyncIterable<UIMessageChunk> {
   const openTextParts = new Set<string>();
   const openReasoningParts = new Set<string>();
+  const openToolCalls = new Set<string>();
   let sentFinish = false;
 
-  yield { type: "start", messageId: generateMessageId() };
+  yield {
+    type: "start",
+    messageId: lastAssistantMessage(originalMessages)?.id ?? generateMessageId(),
+  };
 
   for await (const part of stream) {
     switch (part.type) {
@@ -302,6 +375,7 @@ async function* textStreamToUIMessageStream(
         };
         break;
       case "tool-call":
+        openToolCalls.add(part.toolCallId);
         yield {
           type: "tool-input-available",
           toolCallId: part.toolCallId,
@@ -312,6 +386,37 @@ async function* textStreamToUIMessageStream(
           toolMetadata: part.toolMetadata,
           dynamic: part.dynamic,
           title: part.title,
+        };
+        break;
+      case "tool-approval-request":
+        if (!openToolCalls.has(part.toolCall.toolCallId)) {
+          openToolCalls.add(part.toolCall.toolCallId);
+          yield {
+            type: "tool-input-available",
+            toolCallId: part.toolCall.toolCallId,
+            toolName: part.toolCall.toolName,
+            input: part.toolCall.input,
+            providerExecuted: part.toolCall.providerExecuted,
+            providerMetadata: part.toolCall.providerMetadata,
+            toolMetadata: part.toolCall.toolMetadata,
+            dynamic: part.toolCall.dynamic,
+            title: part.toolCall.title,
+          };
+        }
+        yield {
+          type: "tool-approval-request",
+          approvalId: part.approvalId,
+          toolCallId: part.toolCall.toolCallId,
+          isAutomatic: part.isAutomatic,
+        };
+        break;
+      case "tool-approval-response":
+        yield {
+          type: "tool-approval-response",
+          approvalId: part.approvalId,
+          approved: part.approved,
+          reason: part.reason,
+          providerExecuted: part.providerExecuted,
         };
         break;
       case "tool-result":
@@ -437,6 +542,71 @@ function createUserMessage(id: string, text: string): UIMessage {
     id,
     role: "user",
     parts: [{ type: "text", text }],
+  };
+}
+
+function upsertResponseMessage(
+  messages: UIMessage[],
+  responseMessage: UIMessage,
+  replaceLast: boolean,
+) {
+  if (replaceLast && messages.at(-1)?.role === "assistant") {
+    messages[messages.length - 1] = responseMessage;
+    return;
+  }
+
+  messages.push(responseMessage);
+}
+
+function lastAssistantMessage(messages: UIMessage[]) {
+  const message = messages.at(-1);
+
+  return message?.role === "assistant" ? message : undefined;
+}
+
+function findPendingToolApprovalRequests(message: UIMessage): AgentTUIToolApprovalRequest[] {
+  const requests: AgentTUIToolApprovalRequest[] = [];
+
+  for (const [index, part] of message.parts.entries()) {
+    if (
+      !isToolUIPart(part) ||
+      part.state !== "approval-requested" ||
+      part.approval.isAutomatic === true
+    ) {
+      continue;
+    }
+
+    requests.push({
+      approvalId: part.approval.id,
+      toolCallId: part.toolCallId,
+      toolName: getToolName(part),
+      title: part.title,
+      input: part.input,
+      providerExecuted: part.providerExecuted,
+      messageId: message.id,
+      partIndex: index,
+    });
+  }
+
+  return requests;
+}
+
+function applyToolApprovalResponse(
+  message: UIMessage,
+  request: AgentTUIToolApprovalRequest,
+  response: AgentTUIToolApprovalResponse,
+) {
+  const part = message.parts[request.partIndex];
+
+  if (!part || !isToolUIPart(part) || part.toolCallId !== request.toolCallId) {
+    throw new Error(`Could not find tool approval request ${request.approvalId}.`);
+  }
+
+  part.state = "approval-responded";
+  part.approval = {
+    id: request.approvalId,
+    approved: response.approved,
+    ...(response.reason ? { reason: response.reason } : {}),
   };
 }
 
