@@ -132,7 +132,7 @@ describe("TerminalRenderer", () => {
   it("collapses tool parts to an empty box with name and status", async () => {
     const input = createInput();
     const output = createOutput();
-    const renderer = new TerminalRenderer({ collapseTools: true, input, output });
+    const renderer = new TerminalRenderer({ tools: "collapsed", input, output });
 
     await renderer.renderStream(createMixedStream() as never, {
       title: "Test",
@@ -147,6 +147,62 @@ describe("TerminalRenderer", () => {
     expect(rendered).not.toContain("Input:");
     expect(rendered).not.toContain("Output:");
     expect(rendered).not.toContain('"weather": "sunny"');
+  });
+
+  it("hides tool parts", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ tools: "hidden", input, output });
+
+    await renderer.renderStream(createMixedStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).not.toContain("Tool · weather");
+    expect(rendered).not.toContain("Input:");
+    expect(rendered).not.toContain("Output:");
+    expect(rendered).not.toContain('"weather": "sunny"');
+    expect(rendered).toContain("thinking");
+  });
+
+  it("collapses reasoning parts to an empty box", async () => {
+    const input = createInput();
+    const output = createOutput();
+    output.rows = 20;
+    const renderer = new TerminalRenderer({ reasoning: "collapsed", input, output });
+
+    await renderer.renderStream(createMixedStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).toMatch(/╭ Reasoning ·+╮/);
+    expect(rendered).toMatch(/╰·+╯/);
+    expect(rendered).not.toContain("thinking");
+    expect(rendered).toContain("Tool · weather");
+  });
+
+  it("hides reasoning parts", async () => {
+    const input = createInput();
+    const output = createOutput();
+    output.rows = 20;
+    const renderer = new TerminalRenderer({ reasoning: "hidden", input, output });
+
+    await renderer.renderStream(createMixedStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).not.toContain("Reasoning");
+    expect(rendered).not.toContain("thinking");
+    expect(rendered).toContain("Tool · weather");
   });
 
   it("renders stream errors into the body box", async () => {

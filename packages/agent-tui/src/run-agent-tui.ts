@@ -1,4 +1,5 @@
 import { AgentTUIRunner } from "./agent-tui-runner";
+import type { TerminalPartDisplayMode } from "./tui/terminal-renderer";
 import type { Agent } from "ai";
 
 /**
@@ -18,9 +19,14 @@ export type RunAgentTUIOptions<
   name: string;
 
   /**
-   * Whether tool calls should render collapsed by default.
+   * How tool calls should render.
    */
-  collapseTools?: boolean;
+  tools?: TerminalPartDisplayMode;
+
+  /**
+   * How reasoning parts should render.
+   */
+  reasoning?: TerminalPartDisplayMode;
 };
 
 /**

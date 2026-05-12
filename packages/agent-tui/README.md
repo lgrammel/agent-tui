@@ -64,13 +64,15 @@ await runAgentTUI({
 await runAgentTUI({
   agent,
   name: "My Agent",
-  collapseTools: false,
+  tools: "collapsed",
+  reasoning: "hidden",
 });
 ```
 
 - `agent`: AI SDK agent to run
 - `name`: title shown in the terminal UI
-- `collapseTools`: optionally render tool calls collapsed by default
+- `tools`: render tool calls as `"full"`, `"collapsed"`, or `"hidden"` (defaults to `"full"`)
+- `reasoning`: render reasoning as `"full"`, `"collapsed"`, or `"hidden"` (defaults to `"full"`)
 
 ## Example App
 

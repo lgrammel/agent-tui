@@ -1,5 +1,10 @@
 import type { RunAgentTUIOptions } from "./run-agent-tui";
-import { TerminalRenderer, type TerminalInput, type TerminalOutput } from "./tui/terminal-renderer";
+import {
+  TerminalRenderer,
+  type TerminalInput,
+  type TerminalOutput,
+  type TerminalPartDisplayMode,
+} from "./tui/terminal-renderer";
 import {
   convertToModelMessages,
   type Agent,
@@ -53,7 +58,8 @@ export type AgentTUISessionOptions = {
   submittedPrompt?: string;
   waitForExit?: boolean;
   continueSession?: boolean;
-  collapseTools?: boolean;
+  tools?: TerminalPartDisplayMode;
+  reasoning?: TerminalPartDisplayMode;
 };
 
 export type AgentTUIToolApprovalRequest = {
@@ -98,13 +104,15 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #agent: TAgent;
   readonly #renderer: AgentTUIRenderer;
   readonly #name: string;
-  readonly #collapseTools: boolean;
+  readonly #tools: TerminalPartDisplayMode;
+  readonly #reasoning: TerminalPartDisplayMode;
 
   constructor(options: AgentTUIRunnerOptions<TAgent>) {
     this.#agent = options.agent;
     this.#renderer = createRenderer(options) ?? createDefaultRenderer(options);
     this.#name = options.name;
-    this.#collapseTools = options.collapseTools ?? false;
+    this.#tools = options.tools ?? "full";
+    this.#reasoning = options.reasoning ?? "full";
   }
 
   async run() {
@@ -155,7 +163,8 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           title,
           submittedPrompt: prompt,
           continueSession: Boolean(this.#renderer.readPrompt),
-          collapseTools: this.#collapseTools,
+          tools: this.#tools,
+          reasoning: this.#reasoning,
           waitForExit: false,
         });
 
@@ -221,9 +230,9 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 }
 
 function createDefaultRenderer(options: AgentTUIRunnerOptions) {
-  return options.collapseTools === undefined
+  return options.tools === undefined && options.reasoning === undefined
     ? new TerminalRenderer()
-    : new TerminalRenderer({ collapseTools: options.collapseTools });
+    : new TerminalRenderer({ tools: options.tools, reasoning: options.reasoning });
 }
 
 function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | undefined {
@@ -236,7 +245,8 @@ function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | unde
   }
 
   return new TerminalRenderer({
-    collapseTools: options.collapseTools,
+    tools: options.tools,
+    reasoning: options.reasoning,
     input: options.userInput,
     output: options.screen,
   });

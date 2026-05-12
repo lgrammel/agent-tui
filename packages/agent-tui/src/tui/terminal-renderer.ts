@@ -37,11 +37,14 @@ export type TerminalOutput = {
   off(event: "resize", listener: () => void): TerminalOutput;
 };
 
+export type TerminalPartDisplayMode = "full" | "collapsed" | "hidden";
+
 export type TerminalRendererOptions = {
   input?: TerminalInput;
   output?: TerminalOutput;
   frameBuffer?: TerminalFrameBuffer;
-  collapseTools?: boolean;
+  tools?: TerminalPartDisplayMode;
+  reasoning?: TerminalPartDisplayMode;
 };
 
 export type TerminalSessionOptions = {
@@ -50,7 +53,8 @@ export type TerminalSessionOptions = {
   submittedPrompt?: string;
   waitForExit?: boolean;
   continueSession?: boolean;
-  collapseTools?: boolean;
+  tools?: TerminalPartDisplayMode;
+  reasoning?: TerminalPartDisplayMode;
 };
 
 export type TerminalKey =
@@ -107,7 +111,8 @@ export class TerminalRenderer {
   readonly #input: TerminalInput;
   readonly #output: TerminalOutput;
   readonly #frameBuffer: TerminalFrameBuffer;
-  readonly #collapseTools: boolean;
+  readonly #tools: TerminalPartDisplayMode;
+  readonly #reasoning: TerminalPartDisplayMode;
 
   #sections: ChatSection[] = [];
   #inputText = "";
@@ -127,7 +132,8 @@ export class TerminalRenderer {
     this.#input = options?.input ?? process.stdin;
     this.#output = options?.output ?? process.stdout;
     this.#frameBuffer = options?.frameBuffer ?? new TerminalFrameBuffer(this.#output);
-    this.#collapseTools = options?.collapseTools ?? false;
+    this.#tools = options?.tools ?? "full";
+    this.#reasoning = options?.reasoning ?? "full";
   }
 
   async readPrompt(options?: TerminalSessionOptions): Promise<string> {
@@ -196,7 +202,10 @@ export class TerminalRenderer {
     this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
     this.#interrupted = false;
     this.#assistantOutputTokens = undefined;
-    const collapseTools = options?.collapseTools ?? this.#collapseTools;
+    const displayModes = {
+      tools: options?.tools ?? this.#tools,
+      reasoning: options?.reasoning ?? this.#reasoning,
+    };
     this.#paint();
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
     this.#attachInput();
@@ -213,11 +222,11 @@ export class TerminalRenderer {
         }
 
         responseMessage = message;
-        this.#renderAssistantMessage(message, { collapseTools });
+        this.#renderAssistantMessage(message, displayModes);
       }
 
       if (!this.#interrupted && responseMessage && this.#assistantOutputTokens != null) {
-        this.#renderAssistantMessage(responseMessage, { collapseTools });
+        this.#renderAssistantMessage(responseMessage, displayModes);
       }
     } finally {
       this.#detachInput();
@@ -424,8 +433,9 @@ export class TerminalRenderer {
 
   #renderAssistantMessage(
     message: UIMessage,
-    options?: {
-      collapseTools?: boolean;
+    displayModes: {
+      tools: TerminalPartDisplayMode;
+      reasoning: TerminalPartDisplayMode;
     },
   ) {
     const activeSectionIds = new Set<string>();
@@ -447,20 +457,29 @@ export class TerminalRenderer {
           });
           break;
         case "reasoning":
+          if (displayModes.reasoning === "hidden") {
+            break;
+          }
+
           activeSectionIds.add(id);
           this.#upsertSection({
             id,
             kind: "reasoning",
             title: "Reasoning",
             content: part.text,
+            collapsed: displayModes.reasoning === "collapsed",
           });
           break;
         default:
           if (isToolUIPart(part)) {
+            if (displayModes.tools === "hidden") {
+              break;
+            }
+
             activeSectionIds.add(id);
             this.#upsertSection({
               id,
-              ...renderToolInvocation(part, { collapse: options?.collapseTools ?? false }),
+              ...renderToolInvocation(part, { mode: displayModes.tools }),
             });
           }
           break;
@@ -622,7 +641,7 @@ function formatStreamError(error: unknown) {
 
 function renderToolInvocation(
   part: ToolUIPart | DynamicToolUIPart,
-  options?: { collapse?: boolean },
+  options: { mode: Exclude<TerminalPartDisplayMode, "hidden"> },
 ): ChatSection {
   const toolName = getToolName(part);
   const title = `Tool · ${part.title ?? toolName}`;
@@ -630,7 +649,7 @@ function renderToolInvocation(
   const inputText = input === undefined ? "Input: (streaming...)" : `Input:\n${formatValue(input)}`;
   const status = toolStatus(part);
 
-  if (options?.collapse) {
+  if (options.mode === "collapsed") {
     return {
       kind: "tool",
       title,

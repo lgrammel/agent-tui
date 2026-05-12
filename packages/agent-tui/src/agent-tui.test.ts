@@ -52,7 +52,7 @@ describe("runAgentTUI", () => {
     expect(terminalRendererOptions).toEqual([undefined]);
   });
 
-  it("passes collapseTools to the default terminal renderer", async () => {
+  it("passes display modes to the default terminal renderer", async () => {
     useRenderer(
       createRenderer({
         prompts: [undefined],
@@ -60,9 +60,14 @@ describe("runAgentTUI", () => {
     );
     const agent = createAISDKAgent();
 
-    await runAgentTUI({ agent, name: "Test Agent", collapseTools: true });
+    await runAgentTUI({
+      agent,
+      name: "Test Agent",
+      tools: "collapsed",
+      reasoning: "hidden",
+    });
 
-    expect(terminalRendererOptions).toEqual([{ collapseTools: true }]);
+    expect(terminalRendererOptions).toEqual([{ tools: "collapsed", reasoning: "hidden" }]);
   });
 });
 

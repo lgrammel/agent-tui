@@ -8,6 +8,7 @@ export type {
   TerminalInput,
   TerminalKey,
   TerminalOutput,
+  TerminalPartDisplayMode,
   TerminalRendererOptions,
 } from "./tui/terminal-renderer";
 export type { TerminalFrameBufferOptions, TerminalFrameOutput } from "./tui/terminal-frame-buffer";
