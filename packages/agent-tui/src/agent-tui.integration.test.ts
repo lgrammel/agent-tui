@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { renderAgentUI } from "./agent-tui";
 import { MockScreen, MockUserInput } from "./test/mock-terminal";
 import { createDeferred } from "./util/deferred";
-import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
-import { ToolLoopAgent, tool } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
+import { simulateReadableStream, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 
 describe("renderAgentUI integration", () => {
