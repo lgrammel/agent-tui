@@ -132,6 +132,20 @@ describe("runAgentTUI", () => {
     expect(terminalRendererOptions).toEqual([undefined]);
   });
 
+  it("passes collapseTools to the default terminal renderer", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    useRenderer(
+      createRenderer({
+        prompts: [undefined],
+      }),
+    );
+    const agent = createAgent(streamCalls);
+
+    await runAgentTUI({ agent, name: "Test Agent", collapseTools: true });
+
+    expect(terminalRendererOptions).toEqual([{ collapseTools: true }]);
+  });
+
   it("uses the provided name as the session title", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     const renderer = useRenderer(

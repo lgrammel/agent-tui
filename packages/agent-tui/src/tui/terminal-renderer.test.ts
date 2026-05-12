@@ -92,6 +92,26 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain('"weather": "sunny"');
   });
 
+  it("collapses tool parts to an empty box with name and status", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ collapseTools: true, input, output });
+
+    await renderer.renderStream(createMixedStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).toMatch(/╭ Tool · weather ─+ executing ╮/);
+    expect(rendered).toMatch(/╭ Tool · weather ─+ done ╮/);
+    expect(rendered).toMatch(/╰─+╯/);
+    expect(rendered).not.toContain("Input:");
+    expect(rendered).not.toContain("Output:");
+    expect(rendered).not.toContain('"weather": "sunny"');
+  });
+
   it("renders stream errors into the body box", async () => {
     const input = createInput();
     const output = createOutput();

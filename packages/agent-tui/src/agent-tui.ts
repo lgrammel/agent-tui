@@ -47,6 +47,7 @@ export type AgentTUIRenderer = {
 export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
   agent: TAgent;
   name: string;
+  collapseTools?: boolean;
 };
 
 export type RenderAgentUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> =
@@ -63,6 +64,7 @@ export type AgentTUISessionOptions = {
   submittedPrompt?: string;
   waitForExit?: boolean;
   continueSession?: boolean;
+  collapseTools?: boolean;
 };
 
 export async function runAgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
@@ -76,12 +78,14 @@ export async function renderAgentUI<TAgent extends AgentTUIAgent = AgentTUIAgent
 ) {
   await new AgentTUIRunner(options.agent, {
     name: options.name,
+    collapseTools: options.collapseTools,
     renderer: createRenderer(options),
   }).run();
 }
 
 type AgentTUIRunnerOptions = {
   name: string;
+  collapseTools?: boolean;
   renderer?: AgentTUIRenderer;
 };
 
@@ -89,11 +93,13 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #agent: TAgent;
   readonly #renderer: AgentTUIRenderer;
   readonly #name: string;
+  readonly #collapseTools: boolean;
 
   constructor(agent: TAgent, options?: AgentTUIRunnerOptions) {
     this.#agent = agent;
-    this.#renderer = options?.renderer ?? new TerminalRenderer();
+    this.#renderer = options?.renderer ?? createDefaultRenderer(options);
     this.#name = options?.name ?? "Agent TUI";
+    this.#collapseTools = options?.collapseTools ?? false;
   }
 
   async run() {
@@ -139,6 +145,7 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           title,
           submittedPrompt: prompt,
           continueSession: Boolean(this.#renderer.readPrompt),
+          collapseTools: this.#collapseTools,
           waitForExit: false,
         });
 
@@ -177,6 +184,12 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   }
 }
 
+function createDefaultRenderer(options?: AgentTUIRunnerOptions) {
+  return options?.collapseTools === undefined
+    ? new TerminalRenderer()
+    : new TerminalRenderer({ collapseTools: options.collapseTools });
+}
+
 function createRenderer(options: RenderAgentUIOptions): AgentTUIRenderer | undefined {
   const internal = options["~internal"];
 
@@ -185,6 +198,7 @@ function createRenderer(options: RenderAgentUIOptions): AgentTUIRenderer | undef
   }
 
   return new TerminalRenderer({
+    collapseTools: options.collapseTools,
     input: internal.userInput,
     output: internal.screen,
   });

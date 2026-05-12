@@ -37,6 +37,7 @@ export type TerminalRendererOptions = {
   input?: TerminalInput;
   output?: TerminalOutput;
   frameBuffer?: TerminalFrameBuffer;
+  collapseTools?: boolean;
 };
 
 export type TerminalSessionOptions = {
@@ -45,6 +46,7 @@ export type TerminalSessionOptions = {
   submittedPrompt?: string;
   waitForExit?: boolean;
   continueSession?: boolean;
+  collapseTools?: boolean;
 };
 
 export type TerminalKey =
@@ -64,6 +66,7 @@ type ChatSection = {
   title: string;
   rightTitle?: string;
   content: string;
+  collapsed?: boolean;
   id?: string;
 };
 
@@ -100,6 +103,7 @@ export class TerminalRenderer {
   readonly #input: TerminalInput;
   readonly #output: TerminalOutput;
   readonly #frameBuffer: TerminalFrameBuffer;
+  readonly #collapseTools: boolean;
 
   #sections: ChatSection[] = [];
   #inputText = "";
@@ -119,6 +123,7 @@ export class TerminalRenderer {
     this.#input = options?.input ?? process.stdin;
     this.#output = options?.output ?? process.stdout;
     this.#frameBuffer = options?.frameBuffer ?? new TerminalFrameBuffer(this.#output);
+    this.#collapseTools = options?.collapseTools ?? false;
   }
 
   async readPrompt(options?: TerminalSessionOptions): Promise<string> {
@@ -187,6 +192,7 @@ export class TerminalRenderer {
     this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
     this.#interrupted = false;
     this.#assistantOutputTokens = undefined;
+    const collapseTools = options?.collapseTools ?? this.#collapseTools;
     this.#paint();
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
     this.#attachInput();
@@ -202,11 +208,11 @@ export class TerminalRenderer {
         }
 
         responseMessage = message;
-        this.#renderAssistantMessage(message);
+        this.#renderAssistantMessage(message, { collapseTools });
       }
 
       if (!this.#interrupted && responseMessage && this.#assistantOutputTokens != null) {
-        this.#renderAssistantMessage(responseMessage);
+        this.#renderAssistantMessage(responseMessage, { collapseTools });
       }
     } finally {
       this.#detachInput();
@@ -359,7 +365,12 @@ export class TerminalRenderer {
     this.#paintAfterBodyChange();
   }
 
-  #renderAssistantMessage(message: UIMessage) {
+  #renderAssistantMessage(
+    message: UIMessage,
+    options?: {
+      collapseTools?: boolean;
+    },
+  ) {
     const activeSectionIds = new Set<string>();
     this.#assistantOutputTokens =
       extractOutputTokenCountFromMetadata(message.metadata) ?? this.#assistantOutputTokens;
@@ -392,7 +403,7 @@ export class TerminalRenderer {
             activeSectionIds.add(id);
             this.#upsertSection({
               id,
-              ...renderToolInvocation(part),
+              ...renderToolInvocation(part, { collapse: options?.collapseTools ?? false }),
             });
           }
           break;
@@ -552,11 +563,25 @@ function formatStreamError(error: unknown) {
   return JSON.stringify(error);
 }
 
-function renderToolInvocation(part: ToolUIPart | DynamicToolUIPart): ChatSection {
+function renderToolInvocation(
+  part: ToolUIPart | DynamicToolUIPart,
+  options?: { collapse?: boolean },
+): ChatSection {
   const toolName = getToolName(part);
   const title = `Tool · ${part.title ?? toolName}`;
   const input = "input" in part ? part.input : undefined;
   const inputText = input === undefined ? "Input: (streaming...)" : `Input:\n${formatValue(input)}`;
+  const status = toolStatus(part);
+
+  if (options?.collapse) {
+    return {
+      kind: "tool",
+      title,
+      rightTitle: status,
+      content: "",
+      collapsed: true,
+    };
+  }
 
   switch (part.state) {
     case "input-streaming":
@@ -601,6 +626,21 @@ function renderToolInvocation(part: ToolUIPart | DynamicToolUIPart): ChatSection
         title: `Tool Denied · ${part.title ?? toolName}`,
         content: `${inputText}\n\nReason: ${part.approval.reason ?? "denied"}`,
       };
+  }
+}
+
+function toolStatus(part: ToolUIPart | DynamicToolUIPart) {
+  switch (part.state) {
+    case "input-streaming":
+    case "approval-requested":
+      return "waiting";
+    case "input-available":
+    case "approval-responded":
+      return "executing";
+    case "output-available":
+    case "output-error":
+    case "output-denied":
+      return "done";
   }
 }
 
@@ -668,6 +708,15 @@ function renderSection(section: ChatSection, width: number) {
   const contentWidth = Math.max(1, width - 4);
   const title = ` ${section.title} `;
   const rightTitle = section.rightTitle ? ` ${section.rightTitle} ` : "";
+
+  if (section.collapsed) {
+    const borderWidth = Math.max(0, width - 2 - title.length - rightTitle.length);
+    const top = `${style.color}╭${title}${style.border.repeat(borderWidth)}${rightTitle}╮${colors.reset}`;
+    const bottom = `${style.color}╰${style.border.repeat(Math.max(0, width - 2))}╯${colors.reset}`;
+
+    return [top, bottom].join("\n");
+  }
+
   const borderWidth = Math.max(0, width - 2 - title.length - rightTitle.length);
   const top = `${style.color}╭${title}${style.border.repeat(borderWidth)}${rightTitle}╮${colors.reset}`;
   const bottom = `${style.color}╰${style.border.repeat(Math.max(0, width - 2))}╯${colors.reset}`;
