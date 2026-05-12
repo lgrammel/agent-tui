@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { renderAgentUI } from "./agent-tui";
+import { AgentTUIRunner } from "./agent-tui-runner";
 import { MockScreen, MockUserInput } from "./test/mock-terminal";
 import { createDeferred } from "./util/deferred";
 import { MockLanguageModelV4 } from "ai/test";
 import { simulateReadableStream, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 
-describe("renderAgentUI integration", () => {
+describe("AgentTUIRunner integration", () => {
   it("drives a ToolLoopAgent with mock terminal input and screen snapshots", async () => {
     const screen = new MockScreen({ columns: 54, rows: 14 });
     const userInput = new MockUserInput();
@@ -24,11 +24,12 @@ describe("renderAgentUI integration", () => {
         }),
       },
     });
-    const run = renderAgentUI({
+    const run = new AgentTUIRunner({
       name: "Weather Agent",
       agent,
-      "~internal": { screen, userInput },
-    });
+      screen,
+      userInput,
+    }).run();
 
     try {
       await screen.waitForText("> █");

@@ -1,3 +1,4 @@
+import type { RunAgentTUIOptions } from "./run-agent-tui";
 import { TerminalRenderer, type TerminalInput, type TerminalOutput } from "./tui/terminal-renderer";
 import {
   createAgentUIStream,
@@ -7,6 +8,8 @@ import {
   type UIMessage,
   type UIMessageChunk,
 } from "ai";
+
+type AISDKAgent = Agent<any, any, any, any>;
 
 export type AgentTUIStreamResult = {
   uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
@@ -25,38 +28,15 @@ type AgentTUITextStreamResult = {
   }) => AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
 };
 
-type AgentTUIAdapterStreamResult = AgentTUIStreamResult | AgentTUITextStreamResult;
-type AnyAISDKAgent = Agent<any, any, any, any>;
+export type AgentTUIAdapterStreamResult = AgentTUIStreamResult | AgentTUITextStreamResult;
 
 export type AgentTUIAgent =
-  | AnyAISDKAgent
+  | AISDKAgent
   | {
       stream(
         options: AgentTUIStreamOptions,
       ): Promise<AgentTUIAdapterStreamResult> | AgentTUIAdapterStreamResult;
     };
-
-export type AgentTUIRenderer = {
-  readPrompt?(options?: AgentTUISessionOptions): Promise<string | undefined>;
-  renderStream(
-    result: AgentTUIStreamResult,
-    options?: AgentTUISessionOptions,
-  ): Promise<UIMessage | undefined>;
-};
-
-export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
-  agent: TAgent;
-  name: string;
-  collapseTools?: boolean;
-};
-
-export type RenderAgentUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> =
-  RunAgentTUIOptions<TAgent> & {
-    "~internal"?: {
-      screen?: TerminalOutput;
-      userInput?: TerminalInput;
-    };
-  };
 
 export type AgentTUISessionOptions = {
   title?: string;
@@ -67,39 +47,35 @@ export type AgentTUISessionOptions = {
   collapseTools?: boolean;
 };
 
-export async function runAgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
-  options: RunAgentTUIOptions<TAgent>,
-) {
-  await renderAgentUI(options);
-}
-
-export async function renderAgentUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
-  options: RenderAgentUIOptions<TAgent>,
-) {
-  await new AgentTUIRunner(options.agent, {
-    name: options.name,
-    collapseTools: options.collapseTools,
-    renderer: createRenderer(options),
-  }).run();
-}
-
-type AgentTUIRunnerOptions = {
-  name: string;
-  collapseTools?: boolean;
-  renderer?: AgentTUIRenderer;
+export type AgentTUIRenderer = {
+  readPrompt?(options?: AgentTUISessionOptions): Promise<string | undefined>;
+  renderStream(
+    result: AgentTUIStreamResult,
+    options?: AgentTUISessionOptions,
+  ): Promise<UIMessage | undefined>;
 };
 
-class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
+export type AgentTUIRunnerOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = Omit<
+  RunAgentTUIOptions<AISDKAgent>,
+  "agent"
+> & {
+  agent: TAgent;
+  renderer?: AgentTUIRenderer;
+  screen?: TerminalOutput;
+  userInput?: TerminalInput;
+};
+
+export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #agent: TAgent;
   readonly #renderer: AgentTUIRenderer;
   readonly #name: string;
   readonly #collapseTools: boolean;
 
-  constructor(agent: TAgent, options?: AgentTUIRunnerOptions) {
-    this.#agent = agent;
-    this.#renderer = options?.renderer ?? createDefaultRenderer(options);
-    this.#name = options?.name ?? "Agent TUI";
-    this.#collapseTools = options?.collapseTools ?? false;
+  constructor(options: AgentTUIRunnerOptions<TAgent>) {
+    this.#agent = options.agent;
+    this.#renderer = createRenderer(options) ?? createDefaultRenderer(options);
+    this.#name = options.name;
+    this.#collapseTools = options.collapseTools ?? false;
   }
 
   async run() {
@@ -184,23 +160,25 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   }
 }
 
-function createDefaultRenderer(options?: AgentTUIRunnerOptions) {
-  return options?.collapseTools === undefined
+function createDefaultRenderer(options: AgentTUIRunnerOptions) {
+  return options.collapseTools === undefined
     ? new TerminalRenderer()
     : new TerminalRenderer({ collapseTools: options.collapseTools });
 }
 
-function createRenderer(options: RenderAgentUIOptions): AgentTUIRenderer | undefined {
-  const internal = options["~internal"];
+function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | undefined {
+  if (options.renderer) {
+    return options.renderer;
+  }
 
-  if (!internal?.screen && !internal?.userInput) {
+  if (!options.screen && !options.userInput) {
     return undefined;
   }
 
   return new TerminalRenderer({
     collapseTools: options.collapseTools,
-    input: internal.userInput,
-    output: internal.screen,
+    input: options.userInput,
+    output: options.screen,
   });
 }
 
@@ -478,7 +456,7 @@ function fileToDataUrl(mediaType: string, base64: string) {
   return `data:${mediaType};base64,${base64}`;
 }
 
-function isAISDKAgent(agent: AgentTUIAgent): agent is AnyAISDKAgent {
+function isAISDKAgent(agent: AgentTUIAgent): agent is AISDKAgent {
   return "version" in agent && agent.version === "agent-v1";
 }
 

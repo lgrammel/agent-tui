@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentTUIRenderer } from "./agent-tui";
+import type { AgentTUIAgent, AgentTUIRenderer, AgentTUIStreamOptions } from "./agent-tui-runner";
 
 let testRenderer: AgentTUIRenderer | undefined;
 let terminalRendererOptions: unknown[] = [];
@@ -16,9 +16,11 @@ vi.mock("./tui/terminal-renderer", () => ({
   }),
 }));
 
-import { runAgentTUI, type AgentTUIAgent, type AgentTUIStreamOptions } from "./agent-tui";
+import { runAgentTUI } from "./run-agent-tui";
+import { AgentTUIRunner } from "./agent-tui-runner";
 import {
   readUIMessageStream,
+  type Agent,
   type TextStreamPart,
   type ToolSet,
   type UIMessage,
@@ -26,6 +28,39 @@ import {
 } from "ai";
 
 describe("runAgentTUI", () => {
+  beforeEach(() => {
+    testRenderer = undefined;
+    terminalRendererOptions = [];
+  });
+
+  it("creates the default terminal renderer when none is provided", async () => {
+    useRenderer(
+      createRenderer({
+        prompts: [undefined],
+      }),
+    );
+    const agent = createAISDKAgent();
+
+    await runAgentTUI({ agent, name: "Test Agent" });
+
+    expect(terminalRendererOptions).toEqual([undefined]);
+  });
+
+  it("passes collapseTools to the default terminal renderer", async () => {
+    useRenderer(
+      createRenderer({
+        prompts: [undefined],
+      }),
+    );
+    const agent = createAISDKAgent();
+
+    await runAgentTUI({ agent, name: "Test Agent", collapseTools: true });
+
+    expect(terminalRendererOptions).toEqual([{ collapseTools: true }]);
+  });
+});
+
+describe("AgentTUIRunner", () => {
   beforeEach(() => {
     testRenderer = undefined;
     terminalRendererOptions = [];
@@ -40,7 +75,7 @@ describe("runAgentTUI", () => {
     );
     const agent = createAgent(streamCalls);
 
-    await runAgentTUI({ agent, name: "Test Agent" });
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
     expect(streamCalls).toEqual([
       {
@@ -59,7 +94,7 @@ describe("runAgentTUI", () => {
     );
     const agent = createAgent(streamCalls);
 
-    await runAgentTUI({ agent, name: "Test Agent" });
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
     expect(streamCalls).toEqual([
       {
@@ -85,7 +120,7 @@ describe("runAgentTUI", () => {
     );
     const agent = createMultiStepAgent(streamCalls);
 
-    await runAgentTUI({ agent, name: "Test Agent" });
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
     expect(streamCalls).toEqual([
       {
@@ -113,37 +148,9 @@ describe("runAgentTUI", () => {
     });
     const agent = createAgent(streamCalls);
 
-    await runAgentTUI({ agent, name: "Test Agent" });
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
     expect(streamCalls).toEqual([]);
-  });
-
-  it("creates the default terminal renderer when none is provided", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
-    useRenderer(
-      createRenderer({
-        prompts: [undefined],
-      }),
-    );
-    const agent = createAgent(streamCalls);
-
-    await runAgentTUI({ agent, name: "Test Agent" });
-
-    expect(terminalRendererOptions).toEqual([undefined]);
-  });
-
-  it("passes collapseTools to the default terminal renderer", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
-    useRenderer(
-      createRenderer({
-        prompts: [undefined],
-      }),
-    );
-    const agent = createAgent(streamCalls);
-
-    await runAgentTUI({ agent, name: "Test Agent", collapseTools: true });
-
-    expect(terminalRendererOptions).toEqual([{ collapseTools: true }]);
   });
 
   it("uses the provided name as the session title", async () => {
@@ -155,11 +162,28 @@ describe("runAgentTUI", () => {
     );
     const agent = createAgent(streamCalls);
 
-    await runAgentTUI({ agent, name: "Test Agent" });
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
     expect(terminalRendererOptions).toEqual([undefined]);
     expect(renderer.submittedPrompts).toEqual(["hello"]);
     expect(renderer.titles).toEqual(["Test Agent", "Test Agent", "Test Agent"]);
+  });
+  it("accepts an injected renderer", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    const renderer = createRenderer({
+      prompts: ["hello", undefined],
+    });
+    const agent = createAgent(streamCalls);
+
+    await new AgentTUIRunner({ agent, name: "Test Agent", renderer }).run();
+
+    expect(streamCalls).toEqual([
+      {
+        messages: [createUserMessage("message-1", "hello")],
+      },
+    ]);
+    expect(terminalRendererOptions).toEqual([]);
+    expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
 });
 
@@ -185,6 +209,10 @@ function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAge
       };
     },
   };
+}
+
+function createAISDKAgent(): Agent<any, any, any, any> {
+  return { version: "agent-v1" } as Agent<any, any, any, any>;
 }
 
 type TestRenderer = AgentTUIRenderer & { submittedPrompts: string[]; titles: string[] };

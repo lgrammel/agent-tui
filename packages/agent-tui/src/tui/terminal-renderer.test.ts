@@ -7,7 +7,7 @@ import {
   type TerminalOutput,
 } from "./terminal-renderer";
 import { stripAnsi } from "./layout";
-import type { AgentTUIStreamResult } from "../agent-tui";
+import type { AgentTUIStreamResult } from "../agent-tui-runner";
 import type { UIMessageChunk } from "ai";
 
 describe("parseKey", () => {

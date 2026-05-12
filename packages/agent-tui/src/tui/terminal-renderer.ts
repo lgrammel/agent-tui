@@ -1,4 +1,4 @@
-import type { AgentTUIStreamResult } from "../agent-tui";
+import type { AgentTUIStreamResult } from "../agent-tui-runner";
 import { clampScrollOffset, renderScreen, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
 import { TerminalFrameBuffer } from "./terminal-frame-buffer";
