@@ -22,7 +22,7 @@ await runAgentTUI({
       }),
     },
     toolApproval: {
-      weather: "user-approval"
-    }
+      weather: "user-approval",
+    },
   }),
 });
