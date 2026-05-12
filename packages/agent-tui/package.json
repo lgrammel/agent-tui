@@ -2,6 +2,23 @@
   "name": "@lgrammel/agent-tui",
   "version": "0.1.1",
   "description": "Run AI SDK agents in a terminal UI.",
+  "keywords": [
+    "ai",
+    "ai-sdk",
+    "agent",
+    "ai-agent",
+    "llm",
+    "terminal",
+    "tui",
+    "cli",
+    "terminal-ui",
+    "chat",
+    "chatbot",
+    "tool-calling",
+    "streaming",
+    "markdown",
+    "typescript"
+  ],
   "homepage": "https://github.com/lgrammel/agent-tui#readme",
   "bugs": {
     "url": "https://github.com/lgrammel/agent-tui/issues"
