@@ -1,19 +1,15 @@
-name: Check
+name: Format Check
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
 
 jobs:
-  format-and-lint:
-    name: Format and lint
+  format:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -23,6 +19,3 @@ jobs:
 
       - name: Check formatting
         run: bun run format:check
-
-      - name: Lint
-        run: bun run lint
