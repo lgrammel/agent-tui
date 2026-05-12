@@ -110,6 +110,22 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain('"weather": "sunny"');
   });
 
+  it("does not render empty reasoning parts", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(createEmptyReasoningStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).not.toContain("Reasoning");
+    expect(rendered).toContain("Hello");
+  });
+
   it("renders tool approval statuses in the tool header", async () => {
     const input = createInput();
     const output = createOutput();
@@ -392,6 +408,20 @@ function createMixedStream(): AgentTUIStreamResult {
         toolCallId: "call-1",
         output: { city: "Berlin", weather: "sunny" },
       } satisfies UIMessageChunk;
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createEmptyReasoningStream(): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield { type: "reasoning-start", id: "reasoning-1" };
+      yield { type: "reasoning-end", id: "reasoning-1" };
+      yield { type: "text-start", id: "text-1" };
+      yield { type: "text-delta", id: "text-1", delta: "Hello" };
+      yield { type: "text-end", id: "text-1" };
       yield { type: "finish" };
     })(),
   };

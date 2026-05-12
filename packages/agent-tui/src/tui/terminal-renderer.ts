@@ -457,7 +457,7 @@ export class TerminalRenderer {
           });
           break;
         case "reasoning":
-          if (displayModes.reasoning === "hidden") {
+          if (displayModes.reasoning === "hidden" || part.text.length === 0) {
             break;
           }
 

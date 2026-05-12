@@ -5,8 +5,8 @@ import { z } from "zod";
 
 await runAgentTUI({
   name: "Weather Agent",
-  // tools: "collapsed",
-  // reasoning: "hidden",
+  tools: "full",
+  reasoning: "full",
   agent: new ToolLoopAgent({
     model: openai("gpt-5.4-mini"),
     instructions:
@@ -22,6 +22,7 @@ await runAgentTUI({
         },
       }),
     },
+    reasoning: "medium",
     toolApproval: {
       weather: "user-approval",
     },
