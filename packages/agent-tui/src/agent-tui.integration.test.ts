@@ -70,13 +70,13 @@ describe("AgentTUIRunner integration", () => {
       `);
 
       userInput.enter();
-      await screen.waitForText("Status: running");
+      await screen.waitForText("executing");
       expect(screen.snapshot()).toMatchInlineSnapshot(`
         "┌ Weather Agent ─────────────────────────────────────┐
+        │ ╭ User ──────────────────────────────────────────╮ │
         │ │ weather in Berlin                              │ │
         │ ╰────────────────────────────────────────────────╯ │
-        │ ╭ Tool · weather ────────────────────────────────╮ │
-        │ │ Status: running                                │ │
+        │ ╭ Tool · weather ───────────────────── executing ╮ │
         │ │ Input:                                         │ │
         │ │ {                                              │ │
         │ │   "city": "Berlin"                             │ │
