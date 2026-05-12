@@ -1,4 +1,4 @@
-import { TerminalRenderer } from "./tui/terminal-renderer";
+import { TerminalRenderer, type TerminalInput, type TerminalOutput } from "./tui/terminal-renderer";
 import {
   createAgentUIStream,
   type Agent,
@@ -48,6 +48,14 @@ export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
   name: string;
 };
 
+export type RenderAgentUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> =
+  RunAgentTUIOptions<TAgent> & {
+    "~internal"?: {
+      screen?: TerminalOutput;
+      userInput?: TerminalInput;
+    };
+  };
+
 export type AgentTUISessionOptions = {
   title?: string;
   initialPrompt?: string;
@@ -59,8 +67,15 @@ export type AgentTUISessionOptions = {
 export async function runAgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
   options: RunAgentTUIOptions<TAgent>,
 ) {
+  await renderAgentUI(options);
+}
+
+export async function renderAgentUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
+  options: RenderAgentUIOptions<TAgent>,
+) {
   await new AgentTUIRunner(options.agent, {
     name: options.name,
+    renderer: createRenderer(options),
   }).run();
 }
 
@@ -158,6 +173,19 @@ class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 
     return normalizeStreamResult(result, messages, generateMessageId);
   }
+}
+
+function createRenderer(options: RenderAgentUIOptions): AgentTUIRenderer | undefined {
+  const internal = options["~internal"];
+
+  if (!internal?.screen && !internal?.userInput) {
+    return undefined;
+  }
+
+  return new TerminalRenderer({
+    input: internal.userInput,
+    output: internal.screen,
+  });
 }
 
 function normalizeStreamResult(

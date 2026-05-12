@@ -1,4 +1,4 @@
-export { runAgentTUI } from "./agent-tui";
+export { renderAgentUI, runAgentTUI } from "./agent-tui";
 export { TerminalFrameBuffer } from "./tui/terminal-frame-buffer";
 export { TerminalRenderer, parseKey } from "./tui/terminal-renderer";
 export { clampScrollOffset, renderScreen, wrapText } from "./tui/layout";
@@ -9,6 +9,7 @@ export type {
   AgentTUISessionOptions,
   AgentTUIStreamOptions,
   AgentTUIStreamResult,
+  RenderAgentUIOptions,
   RunAgentTUIOptions,
 } from "./agent-tui";
 export type {
