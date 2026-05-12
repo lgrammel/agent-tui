@@ -12,13 +12,25 @@ import {
   type UIMessageChunk,
 } from "ai";
 
-export type TerminalInput = NodeJS.ReadStream & {
+export type TerminalInput = {
+  isTTY?: boolean;
+  on(event: "data", listener: (chunk: Buffer) => void): TerminalInput;
+  off(event: "data", listener: (chunk: Buffer) => void): TerminalInput;
+  resume(): TerminalInput;
+  pause(): TerminalInput;
   setRawMode?: (mode: boolean) => TerminalInput;
 };
 
-export type TerminalOutput = NodeJS.WriteStream & {
+export type TerminalOutput = {
   columns?: number;
   rows?: number;
+  write(
+    chunk: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean;
+  on(event: "resize", listener: () => void): TerminalOutput;
+  off(event: "resize", listener: () => void): TerminalOutput;
 };
 
 export type TerminalRendererOptions = {
