@@ -25,11 +25,12 @@ import { z } from "zod";
 
 await runAgentTUI({
   name: "Weather Agent",
-  collapseTools: false,
   agent: new ToolLoopAgent({
     model: openai("gpt-5.4-mini"),
     instructions:
-      "You are a concise weather assistant. Use the weather tool when the user asks about weather, then answer in markdown.",
+      "You are a concise weather assistant." +
+      "Use the weather tool when the user asks about weather, " +
+      "then answer in markdown.",
     tools: {
       weather: tool({
         description: "Get the weather in a location",
@@ -56,6 +57,20 @@ await runAgentTUI({
 - `Up` / `Down`: scroll transcript
 - `Ctrl+R`: repaint
 - `Ctrl+C`: exit
+
+## API
+
+```ts
+await runAgentTUI({
+  agent,
+  name: "My Agent",
+  collapseTools: false,
+});
+```
+
+- `agent`: AI SDK agent to run
+- `name`: title shown in the terminal UI
+- `collapseTools`: optionally render tool calls collapsed by default
 
 ## Example App
 
