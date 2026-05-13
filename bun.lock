@@ -25,7 +25,7 @@
     },
     "packages/agent-tui": {
       "name": "@lgrammel/agent-tui",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "ai": "7.0.0-canary.134",
       },
