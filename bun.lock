@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@lgrammel/agent-tui",
@@ -17,17 +16,17 @@
     "examples/basic": {
       "name": "@lgrammel/agent-tui-basic-example",
       "dependencies": {
-        "@ai-sdk/openai": "^4.0.0-canary.54",
+        "@ai-sdk/openai": "4.0.0-canary.55",
         "@lgrammel/agent-tui": "workspace:*",
-        "ai": "^7.0.0-canary.130",
+        "ai": "7.0.0-canary.134",
         "zod": "^4",
       },
     },
     "packages/agent-tui": {
       "name": "@lgrammel/agent-tui",
-      "version": "0.0.0",
+      "version": "0.2.0",
       "dependencies": {
-        "ai": "^7.0.0-canary.130",
+        "ai": "7.0.0-canary.134",
       },
       "peerDependencies": {
         "typescript": "^5",
@@ -35,13 +34,13 @@
     },
   },
   "packages": {
-    "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.0-canary.76", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.37", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-/39J2bTr6J7uKK4Iu0qWxrrpjAFNTN0wVkJMHpBG//oDS4tsWQyN+c3H+hQ/sQkhR0RFd4uzEbOdzluIrD9CQA=="],
+    "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.0-canary.78", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.38", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-wIb7U/psb+BIZ550wz7fH16jkb7gCggF7anY4OR3PGgvvpZnpFWWS5XMXTHMT9D7tFNpHkYcEyZJxq4vzKLWdA=="],
 
-    "@ai-sdk/openai": ["@ai-sdk/openai@4.0.0-canary.54", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.37" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-sYqThCaX9EVFJn66Kt75ZQWMrNGfktjI/8PHfiw2aoa4byhxbNkZD12xcGSe9wl7v9/nRPVDO/uknN3BuZ2ccA=="],
+    "@ai-sdk/openai": ["@ai-sdk/openai@4.0.0-canary.55", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.38" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-rzDVs1LitSBT332jQ6PYZdi5nuvTctKlOJItQyIxKtcrDZuNpNYeWnItK/ncpsD8p4NB3dCjzs6W1tgJA+asKA=="],
 
     "@ai-sdk/provider": ["@ai-sdk/provider@4.0.0-canary.16", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-IJKj5cOfRNbc1+rBIdyqFbsd4tjWY3wrM3y2D2YdZCHLi6qpS2yLN0P+ajEPCEnto6iZFWQHk28iRMwgvFSJRg=="],
 
-    "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@5.0.0-canary.37", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@standard-schema/spec": "^1.1.0", "@workflow/serde": "4.1.0", "eventsource-parser": "^3.0.8" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-wkFRxNKbpFNStSIZyDEoWlbcksq4F3oGxudBBQhf8PrNLqIg6PWfkogaUvENmlLQmDI995QET6x9rBCGq4fVrg=="],
+    "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@5.0.0-canary.38", "", { "dependencies": { "@ai-sdk/provider": "4.0.0-canary.16", "@standard-schema/spec": "^1.1.0", "@workflow/serde": "4.1.0", "eventsource-parser": "^3.0.8" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-4TbKE1lHaYkVWi+yK1RJRAaImRgbhZm6rHuRjxzpezX+SxZwm5tnGg1h/M634b3vy2nYAuGFTqxNlG2sAI9xqQ=="],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 
@@ -313,7 +312,7 @@
 
     "acorn": ["acorn@8.16.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw=="],
 
-    "ai": ["ai@7.0.0-canary.130", "", { "dependencies": { "@ai-sdk/gateway": "4.0.0-canary.76", "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.37" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-6jPifjBEyC5Iz6G2zpNCSpNS73pSxFWzH2oVgp7BaTQFG7T+kZC/RXsoggb8j74ra5kYTOUPr5jCt/bZGZv8BA=="],
+    "ai": ["ai@7.0.0-canary.134", "", { "dependencies": { "@ai-sdk/gateway": "4.0.0-canary.78", "@ai-sdk/provider": "4.0.0-canary.16", "@ai-sdk/provider-utils": "5.0.0-canary.38" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-DFs0men6X5M6KCmIzRKZvWIdaEa+f/C/lC3iSqEX/oRTj24/byFEOBqW13NSbuPPEWS2ENQsGGkiotyXj0e3Jg=="],
 
     "any-promise": ["any-promise@1.3.0", "", {}, "sha512-7UvmKalWRt1wgjL1RrGxoSJW/0QZFIegpeGvZG9kjp8vrRu55XTHbwnqq2GpXm9uLbcuhxm3IqX9OB4MZR1b2A=="],
 

@@ -55,7 +55,7 @@
     "release": "npm publish"
   },
   "dependencies": {
-    "ai": "^7.0.0-canary.130"
+    "ai": "7.0.0-canary.134"
   },
   "peerDependencies": {
     "typescript": "^5"
