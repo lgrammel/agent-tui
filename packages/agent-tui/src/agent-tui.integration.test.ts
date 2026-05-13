@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AgentTUIRunner } from "./agent-tui-runner";
 import { MockScreen, MockUserInput } from "./test/mock-terminal";
 import { createDeferred } from "./util/deferred";
+import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { MockLanguageModelV4 } from "ai/test";
 import { simulateReadableStream, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
@@ -133,6 +134,134 @@ describe("AgentTUIRunner integration", () => {
       await run;
     }
   });
+
+  it("keeps streaming until reasoning after tool execution finishes with text", async () => {
+    const screen = new MockScreen({ columns: 72, rows: 24 });
+    const userInput = new MockUserInput();
+    const weatherResult = createDeferred<{ city: string; temperature: number; weather: string }>();
+    const finalResponse = createDeferred<void>();
+    const agent = new ToolLoopAgent({
+      model: createReasoningWeatherModel(finalResponse.promise),
+      instructions: "Use the weather tool when asked about weather.",
+      tools: {
+        weather: tool({
+          description: "Get the weather in a location",
+          inputSchema: z.object({ city: z.string() }),
+          async execute({ city }) {
+            return await weatherResult.promise.then((result) => ({ ...result, city }));
+          },
+        }),
+      },
+    });
+    const run = new AgentTUIRunner({
+      name: "Weather Agent",
+      agent,
+      screen,
+      userInput,
+    }).run();
+
+    try {
+      await screen.waitForText("> █");
+
+      userInput.type("weather in Berlin");
+      userInput.enter();
+      await screen.waitForText("Checking whether weather data is needed.");
+      await screen.waitForText("executing");
+
+      expect(screen.snapshot()).toMatchInlineSnapshot(`
+        "┌ Weather Agent ───────────────────────────────────────────────────────┐
+        │ ╭ User ────────────────────────────────────────────────────────────╮ │
+        │ │ weather in Berlin                                                │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │ ╭ Reasoning ·······················································╮ │
+        │ │ Checking whether weather data is needed.                         │ │
+        │ ╰··································································╯ │
+        │ ╭ Tool · weather ─────────────────────────────────────── executing ╮ │
+        │ │ Input:                                                           │ │
+        │ │ {                                                                │ │
+        │ │   "city": "Berlin"                                               │ │
+        │ │ }                                                                │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │                                                                      │
+        │                                                                      │
+        │                                                                      │
+        │                                                                      │
+        │                                                                      │
+        │                                                                      │
+        │                                                                      │
+        └──────────────────────────────────────────────────────────────────────┘
+        ┌ Status ──────────────────────────────────────────────────────────────┐
+        │ Streaming... ↑/↓ scroll · Ctrl+C quit                                │
+        └──────────────────────────────────────────────────────────────────────┘"
+      `);
+
+      weatherResult.resolve({ city: "Berlin", temperature: 72, weather: "sunny" });
+      await screen.waitForText('"weather": "sunny"');
+
+      expect(screen.snapshot()).toMatchInlineSnapshot(`
+        "┌ Weather Agent ───────────────────────────────────────────────────────┐
+        │ ╭ User ────────────────────────────────────────────────────────────╮ │
+        │ │ weather in Berlin                                                │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │ ╭ Reasoning ·······················································╮ │
+        │ │ Checking whether weather data is needed.                         │ │
+        │ ╰··································································╯ │
+        │ ╭ Tool · weather ──────────────────────────────────────────── done ╮ │
+        │ │ Input:                                                           │ │
+        │ │ {                                                                │ │
+        │ │   "city": "Berlin"                                               │ │
+        │ │ }                                                                │ │
+        │ │                                                                  │ │
+        │ │ Output:                                                          │ │
+        │ │ {                                                                │ │
+        │ │   "city": "Berlin",                                              │ │
+        │ │   "temperature": 72,                                             │ │
+        │ │   "weather": "sunny"                                             │ │
+        │ │ }                                                                │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        └──────────────────────────────────────────────────────────────────────┘
+        ┌ Status ──────────────────────────────────────────────────────────────┐
+        │ Streaming... ↑/↓ scroll · Ctrl+C quit                                │
+        └──────────────────────────────────────────────────────────────────────┘"
+      `);
+
+      finalResponse.resolve();
+      await screen.waitForText("Composing the final weather answer.");
+      await screen.waitForText("Berlin is sunny and 72F.");
+      await screen.waitForText("┌ Input");
+
+      expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
+        "┌ Weather Agent ───────────────────────────────────────────────────────┐
+        │ ╭ Tool · weather ──────────────────────────────────────────── done ╮ │
+        │ │ Input:                                                           │ │
+        │ │ {                                                                │ │
+        │ │   "city": "Berlin"                                               │ │
+        │ │ }                                                                │ │
+        │ │                                                                  │ │
+        │ │ Output:                                                          │ │
+        │ │ {                                                                │ │
+        │ │   "city": "Berlin",                                              │ │
+        │ │   "temperature": 72,                                             │ │
+        │ │   "weather": "sunny"                                             │ │
+        │ │ }                                                                │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │ ╭ Reasoning ·······················································╮ │
+        │ │ Composing the final weather answer.                              │ │
+        │ ╰··································································╯ │
+        │ ╭ Assistant ─ tok/s ╮ │
+        │ │ Berlin is sunny and 72F.                                         │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        └──────────────────────────────────────────────────────────────────────┘
+        ┌ Input ───────────────────────────────────────────────────────────────┐
+        │ > █                                                                  │
+        └──────────────────────────────────────────────────────────────────────┘"
+      `);
+    } finally {
+      finalResponse.resolve();
+      userInput.ctrlC();
+      await run;
+    }
+  });
 });
 
 function normalizeTokensPerSecond(snapshot: string) {
@@ -191,6 +320,86 @@ function createWeatherModel() {
           ],
           chunkDelayInMs: null,
           initialDelayInMs: null,
+        }),
+      };
+    },
+  });
+}
+
+function createReasoningWeatherModel(finalResponse: Promise<void>) {
+  let callCount = 0;
+
+  return new MockLanguageModelV4({
+    doStream: async () => {
+      callCount += 1;
+
+      if (callCount === 1) {
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "stream-start", warnings: [] },
+              {
+                type: "response-metadata",
+                id: "response-1",
+                modelId: "mock-model",
+                timestamp: new Date(0),
+              },
+              { type: "reasoning-start", id: "reasoning-1" },
+              {
+                type: "reasoning-delta",
+                id: "reasoning-1",
+                delta: "Checking whether weather data is needed.",
+              },
+              { type: "reasoning-end", id: "reasoning-1" },
+              {
+                type: "tool-call",
+                toolCallId: "call-1",
+                toolName: "weather",
+                input: '{ "city": "Berlin" }',
+              },
+              {
+                ...finishChunk(),
+                finishReason: { unified: "tool-calls", raw: undefined },
+              },
+            ],
+            chunkDelayInMs: null,
+            initialDelayInMs: null,
+          }),
+        };
+      }
+
+      return {
+        stream: new ReadableStream({
+          async start(controller) {
+            await finalResponse;
+
+            const chunks: LanguageModelV4StreamPart[] = [
+              { type: "stream-start", warnings: [] },
+              {
+                type: "response-metadata",
+                id: "response-2",
+                modelId: "mock-model",
+                timestamp: new Date(0),
+              },
+              { type: "reasoning-start", id: "reasoning-2" },
+              {
+                type: "reasoning-delta",
+                id: "reasoning-2",
+                delta: "Composing the final weather answer.",
+              },
+              { type: "reasoning-end", id: "reasoning-2" },
+              { type: "text-start", id: "text-1" },
+              { type: "text-delta", id: "text-1", delta: "Berlin is sunny and 72F." },
+              { type: "text-end", id: "text-1" },
+              finishChunk(),
+            ];
+
+            for (const chunk of chunks) {
+              controller.enqueue(chunk);
+            }
+
+            controller.close();
+          },
         }),
       };
     },
