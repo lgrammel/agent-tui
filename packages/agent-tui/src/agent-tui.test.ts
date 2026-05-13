@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  AgentTUIAgent,
   AgentTUIRenderer,
   AgentTUISessionOptions,
-  AgentTUIStreamOptions,
   AgentTUIToolApprovalRequest,
   AgentTUIToolApprovalResponse,
 } from "./agent-tui-runner";
@@ -24,10 +22,13 @@ vi.mock("./tui/terminal-renderer", () => ({
 }));
 
 import { runAgentTUI } from "./run-agent-tui";
+import type { AgentTUIAgent } from "./run-agent-tui";
 import { AgentTUIRunner } from "./agent-tui-runner";
 import {
   readUIMessageStream,
   type Agent,
+  type AgentStreamParameters,
+  type ModelMessage,
   type TextStreamPart,
   type ToolSet,
   type UIMessage,
@@ -98,7 +99,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("prompts before the first turn", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["hello", undefined],
@@ -110,14 +111,14 @@ describe("AgentTUIRunner", () => {
 
     expect(streamCalls).toEqual([
       {
-        messages: [createUserMessage("message-1", "hello")],
+        prompt: [createUserModelMessage("hello")],
       },
     ]);
     expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
 
   it("continues prompting and passes message history", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["first", "second", undefined],
@@ -129,13 +130,13 @@ describe("AgentTUIRunner", () => {
 
     expect(streamCalls).toEqual([
       {
-        messages: [createUserMessage("message-1", "first")],
+        prompt: [createUserModelMessage("first")],
       },
       {
-        messages: [
-          createUserMessage("message-1", "first"),
-          createAssistantMessage("message-2", "response to first"),
-          createUserMessage("message-3", "second"),
+        prompt: [
+          createUserModelMessage("first"),
+          createAssistantModelMessage("response to first"),
+          createUserModelMessage("second"),
         ],
       },
     ]);
@@ -143,7 +144,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("collects assistant text after tool calls in a multi-step stream", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     useRenderer(
       createRenderer({
         prompts: ["weather", "next", undefined],
@@ -155,20 +156,21 @@ describe("AgentTUIRunner", () => {
 
     expect(streamCalls).toEqual([
       {
-        messages: [createUserMessage("message-1", "weather")],
+        prompt: [createUserModelMessage("weather")],
       },
       {
-        messages: [
-          createUserMessage("message-1", "weather"),
-          createAssistantMessageWithToolInvocation("message-2"),
-          createUserMessage("message-3", "next"),
+        prompt: [
+          createUserModelMessage("weather"),
+          createAssistantModelMessageWithToolInvocation(),
+          createToolModelMessageWithToolInvocation(),
+          createUserModelMessage("next"),
         ],
       },
     ]);
   });
 
   it("continues the turn with a tool approval response", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["run command", undefined],
@@ -181,12 +183,13 @@ describe("AgentTUIRunner", () => {
 
     expect(streamCalls).toEqual([
       {
-        messages: [createUserMessage("message-1", "run command")],
+        prompt: [createUserModelMessage("run command")],
       },
       {
-        messages: [
-          createUserMessage("message-1", "run command"),
-          createAssistantMessageWithToolApproval("message-2", true),
+        prompt: [
+          createUserModelMessage("run command"),
+          createAssistantModelMessageWithToolApproval(),
+          createToolModelMessageWithToolApproval(true),
         ],
       },
     ]);
@@ -204,7 +207,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("exits when prompt input is interrupted", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     useRenderer({
       async readPrompt() {
         throw new Error("Interrupted");
@@ -221,7 +224,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("uses the provided name as the session title", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["hello", undefined],
@@ -237,7 +240,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("defaults assistant response stats mode to tokens per second", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["hello", undefined],
@@ -251,7 +254,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("passes assistant response stats mode to stream rendering", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
       createRenderer({
         prompts: ["hello", undefined],
@@ -269,7 +272,7 @@ describe("AgentTUIRunner", () => {
   });
 
   it("accepts an injected renderer", async () => {
-    const streamCalls: AgentTUIStreamOptions[] = [];
+    const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = createRenderer({
       prompts: ["hello", undefined],
     });
@@ -279,7 +282,7 @@ describe("AgentTUIRunner", () => {
 
     expect(streamCalls).toEqual([
       {
-        messages: [createUserMessage("message-1", "hello")],
+        prompt: [createUserModelMessage("hello")],
       },
     ]);
     expect(terminalRendererOptions).toEqual([]);
@@ -287,39 +290,59 @@ describe("AgentTUIRunner", () => {
   });
 });
 
-function createAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
+type AgentTUIStreamCall = AgentStreamParameters<never, any, any>;
+
+function createAgent(streamCalls: AgentTUIStreamCall[]): AgentTUIAgent {
   return {
-    stream(options: AgentTUIStreamOptions) {
+    version: "agent-v1",
+    id: undefined,
+    tools: {},
+    generate() {
+      throw new Error("Expected no generate call.");
+    },
+    stream(options: AgentTUIStreamCall) {
       streamCalls.push(options);
 
       return {
-        fullStream: createStream(`response to ${messageText(lastUserMessage(options))}`),
-      };
+        fullStream: createStream(`response to ${lastUserMessageText(options)}`),
+      } as any;
     },
   };
 }
 
-function createMultiStepAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
+function createMultiStepAgent(streamCalls: AgentTUIStreamCall[]): AgentTUIAgent {
   return {
-    stream(options: AgentTUIStreamOptions) {
+    version: "agent-v1",
+    id: undefined,
+    tools: {},
+    generate() {
+      throw new Error("Expected no generate call.");
+    },
+    stream(options: AgentTUIStreamCall) {
       streamCalls.push(options);
 
       return {
         fullStream: createMultiStepStream(),
-      };
+      } as any;
     },
   };
 }
 
-function createApprovalAgent(streamCalls: AgentTUIStreamOptions[]): AgentTUIAgent {
+function createApprovalAgent(streamCalls: AgentTUIStreamCall[]): AgentTUIAgent {
   return {
-    stream(options: AgentTUIStreamOptions) {
+    version: "agent-v1",
+    id: undefined,
+    tools: {},
+    generate() {
+      throw new Error("Expected no generate call.");
+    },
+    stream(options: AgentTUIStreamCall) {
       streamCalls.push(options);
 
       return {
         fullStream:
           streamCalls.length === 1 ? createApprovalRequestStream() : createApprovalResponseStream(),
-      };
+      } as any;
     },
   };
 }
@@ -406,67 +429,101 @@ function createStream(text: string): AsyncIterable<TextStreamPart<ToolSet>> {
   })();
 }
 
-function lastUserMessage(options: AgentTUIStreamOptions) {
-  const message = options.messages.findLast((message) => message.role === "user");
+function lastUserMessageText(options: AgentTUIStreamCall) {
+  const prompt = options.prompt as ModelMessage[];
+  const message = prompt.findLast((message) => message.role === "user");
 
   if (!message) {
     throw new Error("Expected at least one user message.");
   }
 
-  return message;
+  return modelMessageText(message);
 }
 
-function messageText(message: UIMessage) {
-  return message.parts
+function modelMessageText(message: ModelMessage) {
+  if (typeof message.content === "string") {
+    return message.content;
+  }
+
+  return message.content
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("");
 }
 
-function createUserMessage(id: string, text: string): UIMessage {
+function createUserModelMessage(text: string): ModelMessage {
   return {
-    id,
     role: "user",
-    parts: [{ type: "text", text }],
+    content: [{ type: "text", text }],
   };
 }
 
-function createAssistantMessage(id: string, text: string): UIMessage {
+function createAssistantModelMessage(text: string): ModelMessage {
   return {
-    id,
     role: "assistant",
-    parts: [{ type: "text", text, state: "done" }],
+    content: [{ type: "text", text }],
   };
 }
 
-function createAssistantMessageWithToolInvocation(id: string): UIMessage {
+function createAssistantModelMessageWithToolInvocation(): ModelMessage {
   return {
-    id,
     role: "assistant",
-    parts: [
+    content: [
       {
-        type: "tool-weather",
+        type: "tool-call",
         toolCallId: "call-1",
-        state: "output-available",
+        toolName: "weather",
         input: { city: "Berlin" },
-        output: { city: "Berlin", temperature: 72, weather: "snowy" },
       },
-      { type: "text", text: "Berlin is snowy and 72F.", state: "done" },
+      { type: "text", text: "Berlin is snowy and 72F." },
     ],
   };
 }
 
-function createAssistantMessageWithToolApproval(id: string, approved: boolean): UIMessage {
+function createToolModelMessageWithToolInvocation(): ModelMessage {
   return {
-    id,
-    role: "assistant",
-    parts: [
+    role: "tool",
+    content: [
       {
-        type: "tool-shell",
+        type: "tool-result",
         toolCallId: "call-1",
-        state: "approval-responded",
+        toolName: "weather",
+        output: {
+          type: "json",
+          value: { city: "Berlin", temperature: 72, weather: "snowy" },
+        },
+      },
+    ],
+  };
+}
+
+function createAssistantModelMessageWithToolApproval(): ModelMessage {
+  return {
+    role: "assistant",
+    content: [
+      {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "shell",
         input: { command: "date" },
-        approval: { id: "approval-1", approved },
+      },
+      {
+        type: "tool-approval-request",
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+      },
+    ],
+  };
+}
+
+function createToolModelMessageWithToolApproval(approved: boolean): ModelMessage {
+  return {
+    role: "tool",
+    content: [
+      {
+        type: "tool-approval-response",
+        approvalId: "approval-1",
+        approved,
       },
     ],
   };

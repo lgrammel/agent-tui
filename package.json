@@ -15,7 +15,7 @@
     "package:pack:dry-run": "bun run --cwd packages/agent-tui pack:dry-run",
     "package:release:dry-run": "bun run --cwd packages/agent-tui release:dry-run",
     "package:release": "bun run --cwd packages/agent-tui release",
-    "test": "vitest run",
+    "test": "vitest run --typecheck",
     "weather": "bun run --cwd examples/basic weather"
   },
   "devDependencies": {

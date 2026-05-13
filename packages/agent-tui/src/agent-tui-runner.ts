@@ -1,4 +1,4 @@
-import type { RunAgentTUIOptions } from "./run-agent-tui";
+import type { AgentTUIAgent, RunAgentTUIOptions } from "./run-agent-tui";
 import {
   TerminalRenderer,
   type AssistantResponseStatsMode,
@@ -8,10 +8,8 @@ import {
 } from "./tui/terminal-renderer";
 import {
   convertToModelMessages,
-  type Agent,
   getToolName,
   isToolUIPart,
-  type ModelMessage,
   type StepResultPerformance,
   type TextStreamPart,
   type ToolSet,
@@ -19,7 +17,6 @@ import {
   type UIMessageChunk,
 } from "ai";
 
-type AISDKAgent = Agent<any, any, any, any>;
 const defaultAssistantResponseStats: AssistantResponseStatsMode = "tokensPerSecond";
 
 export type AgentTUIStreamResult = {
@@ -30,30 +27,6 @@ export type AgentTUIStreamResult = {
 export type AgentTUIStreamOptions = {
   messages: UIMessage[];
 };
-
-type AgentTUIAISDKStreamOptions = {
-  prompt: ModelMessage[];
-  options: unknown;
-};
-
-type AgentTUITextStreamResult = {
-  fullStream: AsyncIterable<TextStreamPart<ToolSet>>;
-  toUIMessageStream?: (options?: {
-    originalMessages?: UIMessage[];
-    generateMessageId?: () => string;
-    messageMetadata?: (options: { part: TextStreamPart<ToolSet> }) => unknown;
-  }) => AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
-};
-
-export type AgentTUIAdapterStreamResult = AgentTUIStreamResult | AgentTUITextStreamResult;
-
-export type AgentTUIAgent =
-  | AISDKAgent
-  | {
-      stream(
-        options: AgentTUIStreamOptions,
-      ): Promise<AgentTUIAdapterStreamResult> | AgentTUIAdapterStreamResult;
-    };
 
 export type AgentTUISessionOptions = {
   title?: string;
@@ -95,7 +68,7 @@ export type AgentTUIRenderer = {
 };
 
 export type AgentTUIRunnerOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = Omit<
-  RunAgentTUIOptions<AISDKAgent>,
+  RunAgentTUIOptions<AgentTUIAgent>,
   "agent"
 > & {
   agent: TAgent;
@@ -214,25 +187,14 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     messages: UIMessage[],
     generateMessageId: () => string,
   ): Promise<AgentTUIStreamResult> {
-    if (isAISDKAgent(this.#agent)) {
-      const result = await this.#agent.stream({
-        prompt: await convertToModelMessages(messages, { tools: this.#agent.tools }),
-        options: undefined,
-      } as AgentTUIAISDKStreamOptions);
+    const result = await this.#agent.stream({
+      prompt: await convertToModelMessages(messages, { tools: this.#agent.tools }),
+    });
 
-      return {
-        uiMessageStream: textStreamToUIMessageStream(
-          result.fullStream,
-          generateMessageId,
-          messages,
-        ),
-        message: lastAssistantMessage(messages),
-      };
-    }
-
-    const result = await this.#agent.stream({ messages });
-
-    return normalizeStreamResult(result, messages, generateMessageId);
+    return {
+      uiMessageStream: textStreamToUIMessageStream(result.fullStream, generateMessageId, messages),
+      message: lastAssistantMessage(messages),
+    };
   }
 }
 
@@ -264,38 +226,6 @@ function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | unde
     input: options.userInput,
     output: options.screen,
   });
-}
-
-function normalizeStreamResult(
-  result: AgentTUIAdapterStreamResult,
-  originalMessages: UIMessage[],
-  generateMessageId: () => string,
-): AgentTUIStreamResult {
-  const message = lastAssistantMessage(originalMessages);
-
-  if ("uiMessageStream" in result) {
-    return { ...result, message };
-  }
-
-  if (result.toUIMessageStream) {
-    return {
-      uiMessageStream: result.toUIMessageStream({
-        originalMessages,
-        generateMessageId,
-        messageMetadata: createMessageMetadata,
-      }),
-      message,
-    };
-  }
-
-  return {
-    uiMessageStream: textStreamToUIMessageStream(
-      result.fullStream,
-      generateMessageId,
-      originalMessages,
-    ),
-    message,
-  };
 }
 
 async function* textStreamToUIMessageStream(
@@ -553,16 +483,6 @@ function createResponseMetadata(
   };
 }
 
-function createMessageMetadata(options: { part: TextStreamPart<ToolSet> }) {
-  const { part } = options;
-
-  if (part.type !== "finish") {
-    return undefined;
-  }
-
-  return createResponseMetadata(part.totalUsage.outputTokens);
-}
-
 type ResponseMetadata = {
   usage?: {
     outputTokens: number;
@@ -669,10 +589,6 @@ function formatStreamError(error: unknown) {
 
 function fileToDataUrl(mediaType: string, base64: string) {
   return `data:${mediaType};base64,${base64}`;
-}
-
-function isAISDKAgent(agent: AgentTUIAgent): agent is AISDKAgent {
-  return "version" in agent && agent.version === "agent-v1";
 }
 
 function isInterruptedError(error: unknown) {
