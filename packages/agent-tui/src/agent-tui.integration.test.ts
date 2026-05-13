@@ -262,6 +262,48 @@ describe("AgentTUIRunner integration", () => {
       await run;
     }
   });
+
+  it("trims assistant text and does not render whitespace-only reasoning", async () => {
+    const screen = new MockScreen({ columns: 72, rows: 12 });
+    const userInput = new MockUserInput();
+    const agent = new ToolLoopAgent({
+      model: createWhitespaceModel(),
+    });
+    const run = new AgentTUIRunner({
+      name: "Test Agent",
+      agent,
+      screen,
+      userInput,
+    }).run();
+
+    try {
+      await screen.waitForText("> █");
+
+      userInput.type("hello");
+      userInput.enter();
+      await screen.waitForText("Hello! How can I help you today?");
+      await screen.waitForText("┌ Input");
+
+      expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
+        "┌ Test Agent ──────────────────────────────────────────────────────────┐
+        │ ╭ User ────────────────────────────────────────────────────────────╮ │
+        │ │ hello                                                            │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │ ╭ Assistant ─ tok/s ╮ │
+        │ │ Hello! How can I help you today?                                 │ │
+        │ ╰──────────────────────────────────────────────────────────────────╯ │
+        │                                                                      │
+        └──────────────────────────────────────────────────────────────────────┘
+        ┌ Input ───────────────────────────────────────────────────────────────┐
+        │ > █                                                                  │
+        └──────────────────────────────────────────────────────────────────────┘"
+      `);
+      expect(screen.snapshot()).not.toContain("Reasoning");
+    } finally {
+      userInput.ctrlC();
+      await run;
+    }
+  });
 });
 
 function normalizeTokensPerSecond(snapshot: string) {
@@ -403,6 +445,41 @@ function createReasoningWeatherModel(finalResponse: Promise<void>) {
         }),
       };
     },
+  });
+}
+
+function createWhitespaceModel() {
+  return new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          { type: "stream-start", warnings: [] },
+          {
+            type: "response-metadata",
+            id: "response-1",
+            modelId: "mock-model",
+            timestamp: new Date(0),
+          },
+          { type: "reasoning-start", id: "reasoning-1" },
+          {
+            type: "reasoning-delta",
+            id: "reasoning-1",
+            delta: "\n\n   \t  ",
+          },
+          { type: "reasoning-end", id: "reasoning-1" },
+          { type: "text-start", id: "text-1" },
+          {
+            type: "text-delta",
+            id: "text-1",
+            delta: "\n\n  Hello! How can I help you today?  \n\n",
+          },
+          { type: "text-end", id: "text-1" },
+          finishChunk(),
+        ],
+        chunkDelayInMs: null,
+        initialDelayInMs: null,
+      }),
+    }),
   });
 }
 

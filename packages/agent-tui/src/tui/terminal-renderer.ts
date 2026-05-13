@@ -460,7 +460,13 @@ export class TerminalRenderer {
       const id = sectionId(message.id, index);
 
       switch (part.type) {
-        case "text":
+        case "text": {
+          const content = part.text.trim();
+
+          if (content.length === 0) {
+            break;
+          }
+
           activeSectionIds.add(id);
           this.#upsertSection({
             id,
@@ -473,11 +479,14 @@ export class TerminalRenderer {
               },
               displayModes.assistantResponseStats,
             ),
-            content: part.text,
+            content,
           });
           break;
-        case "reasoning":
-          if (displayModes.reasoning === "hidden" || part.text.length === 0) {
+        }
+        case "reasoning": {
+          const content = part.text.trim();
+
+          if (displayModes.reasoning === "hidden" || content.length === 0) {
             break;
           }
 
@@ -486,10 +495,11 @@ export class TerminalRenderer {
             id,
             kind: "reasoning",
             title: "Reasoning",
-            content: part.text,
+            content,
             collapsed: displayModes.reasoning === "collapsed",
           });
           break;
+        }
         default:
           if (isToolUIPart(part)) {
             if (displayModes.tools === "hidden") {
