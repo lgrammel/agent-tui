@@ -91,7 +91,7 @@ describe("AgentTUIRunner integration", () => {
       weatherResult.resolve({ city: "Berlin", temperature: 72, weather: "sunny" });
       await screen.waitForText("Berlin is sunny and 72F.");
       await screen.waitForText("┌ Input");
-      expect(screen.snapshot()).toMatchInlineSnapshot(`
+      expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
         "┌ Weather Agent ─────────────────────────────────────┐
         │ │ {                                              │ │
         │ │   "city": "Berlin",                            │ │
@@ -99,7 +99,7 @@ describe("AgentTUIRunner integration", () => {
         │ │   "weather": "sunny"                           │ │
         │ │ }                                              │ │
         │ ╰────────────────────────────────────────────────╯ │
-        │ ╭ Assistant ────────────────────────── 20 tokens ╮ │
+        │ ╭ Assistant ─ tok/s ╮ │
         │ │ Berlin is sunny and 72F.                       │ │
         │ ╰────────────────────────────────────────────────╯ │
         └────────────────────────────────────────────────────┘
@@ -110,7 +110,7 @@ describe("AgentTUIRunner integration", () => {
 
       screen.resize(64, 16);
       await screen.waitForText("┌ Weather Agent");
-      expect(screen.snapshot()).toMatchInlineSnapshot(`
+      expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
         "┌ Weather Agent ───────────────────────────────────────────────┐
         │ │                                                          │ │
         │ │ Output:                                                  │ │
@@ -120,7 +120,7 @@ describe("AgentTUIRunner integration", () => {
         │ │   "weather": "sunny"                                     │ │
         │ │ }                                                        │ │
         │ ╰──────────────────────────────────────────────────────────╯ │
-        │ ╭ Assistant ──────────────────────────────────── 20 tokens ╮ │
+        │ ╭ Assistant ─ tok/s ╮ │
         │ │ Berlin is sunny and 72F.                                 │ │
         │ ╰──────────────────────────────────────────────────────────╯ │
         └──────────────────────────────────────────────────────────────┘
@@ -134,6 +134,10 @@ describe("AgentTUIRunner integration", () => {
     }
   });
 });
+
+function normalizeTokensPerSecond(snapshot: string) {
+  return snapshot.replace(/│ ╭ Assistant ─+ [\d,.]+ tok\/s ╮ │/g, "│ ╭ Assistant ─ tok/s ╮ │");
+}
 
 function createWeatherModel() {
   let callCount = 0;

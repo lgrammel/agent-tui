@@ -10,6 +10,7 @@ import {
   getToolName,
   isToolUIPart,
   readUIMessageStream,
+  type StepResultPerformance,
   type DynamicToolUIPart,
   type ToolUIPart,
   type UIMessage,
@@ -38,6 +39,8 @@ export type TerminalOutput = {
 };
 
 export type TerminalPartDisplayMode = "full" | "collapsed" | "hidden";
+export type AssistantResponseStatsMode = "tokens" | "tokensPerSecond";
+const defaultAssistantResponseStats: AssistantResponseStatsMode = "tokensPerSecond";
 
 export type TerminalRendererOptions = {
   input?: TerminalInput;
@@ -45,6 +48,7 @@ export type TerminalRendererOptions = {
   frameBuffer?: TerminalFrameBuffer;
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
+  assistantResponseStats?: AssistantResponseStatsMode;
 };
 
 export type TerminalSessionOptions = {
@@ -55,6 +59,7 @@ export type TerminalSessionOptions = {
   continueSession?: boolean;
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
+  assistantResponseStats?: AssistantResponseStatsMode;
 };
 
 export type TerminalKey =
@@ -83,8 +88,9 @@ type StreamUsage = {
   completionTokens?: number;
 };
 
-type MessageMetadataWithUsage = {
+type MessageMetadataWithStats = {
   usage?: StreamUsage;
+  performance?: Pick<StepResultPerformance, "tokensPerSecond">;
 };
 
 const colors = {
@@ -113,6 +119,7 @@ export class TerminalRenderer {
   readonly #frameBuffer: TerminalFrameBuffer;
   readonly #tools: TerminalPartDisplayMode;
   readonly #reasoning: TerminalPartDisplayMode;
+  readonly #assistantResponseStats: AssistantResponseStatsMode;
 
   #sections: ChatSection[] = [];
   #inputText = "";
@@ -123,6 +130,7 @@ export class TerminalRenderer {
   #isInteractive = false;
   #interrupted = false;
   #assistantOutputTokens?: number;
+  #assistantTokensPerSecond?: number;
   #inputCursorVisible = true;
   #inputCursorTimer?: ReturnType<typeof setInterval>;
   #onData?: (chunk: Buffer) => void;
@@ -134,6 +142,7 @@ export class TerminalRenderer {
     this.#frameBuffer = options?.frameBuffer ?? new TerminalFrameBuffer(this.#output);
     this.#tools = options?.tools ?? "full";
     this.#reasoning = options?.reasoning ?? "full";
+    this.#assistantResponseStats = options?.assistantResponseStats ?? defaultAssistantResponseStats;
   }
 
   async readPrompt(options?: TerminalSessionOptions): Promise<string> {
@@ -202,9 +211,11 @@ export class TerminalRenderer {
     this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
     this.#interrupted = false;
     this.#assistantOutputTokens = undefined;
+    this.#assistantTokensPerSecond = undefined;
     const displayModes = {
       tools: options?.tools ?? this.#tools,
       reasoning: options?.reasoning ?? this.#reasoning,
+      assistantResponseStats: options?.assistantResponseStats ?? this.#assistantResponseStats,
     };
     this.#paint();
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
@@ -436,11 +447,14 @@ export class TerminalRenderer {
     displayModes: {
       tools: TerminalPartDisplayMode;
       reasoning: TerminalPartDisplayMode;
+      assistantResponseStats: AssistantResponseStatsMode;
     },
   ) {
     const activeSectionIds = new Set<string>();
-    this.#assistantOutputTokens =
-      extractOutputTokenCountFromMetadata(message.metadata) ?? this.#assistantOutputTokens;
+    const metadataStats = extractAssistantResponseStatsFromMetadata(message.metadata);
+    this.#assistantOutputTokens = metadataStats.outputTokens ?? this.#assistantOutputTokens;
+    this.#assistantTokensPerSecond =
+      metadataStats.tokensPerSecond ?? this.#assistantTokensPerSecond;
 
     for (const [index, part] of message.parts.entries()) {
       const id = sectionId(message.id, index);
@@ -452,7 +466,13 @@ export class TerminalRenderer {
             id,
             kind: "assistant",
             title: "Assistant",
-            rightTitle: formatTokenCount(this.#assistantOutputTokens),
+            rightTitle: formatAssistantResponseStats(
+              {
+                outputTokens: this.#assistantOutputTokens,
+                tokensPerSecond: this.#assistantTokensPerSecond,
+              },
+              displayModes.assistantResponseStats,
+            ),
             content: part.text,
           });
           break;
@@ -523,7 +543,9 @@ export class TerminalRenderer {
       }
 
       if (chunk.type === "finish") {
-        this.#assistantOutputTokens = extractOutputTokenCount(chunk);
+        const stats = extractAssistantResponseStats(chunk);
+        this.#assistantOutputTokens = stats.outputTokens;
+        this.#assistantTokensPerSecond = stats.tokensPerSecond;
       }
 
       yield chunk;
@@ -857,20 +879,30 @@ function findVisibleBreakPoint(input: string, width: number) {
   return sliceVisible(input, width).length;
 }
 
-function extractOutputTokenCount(chunk: UIMessageChunk) {
+function extractAssistantResponseStats(chunk: UIMessageChunk) {
   const usage = "usage" in chunk ? (chunk.usage as StreamUsage | undefined) : undefined;
   const metadataUsage =
     "messageMetadata" in chunk
-      ? (chunk.messageMetadata as MessageMetadataWithUsage | undefined)?.usage
+      ? (chunk.messageMetadata as MessageMetadataWithStats | undefined)?.usage
+      : undefined;
+  const metadataPerformance =
+    "messageMetadata" in chunk
+      ? (chunk.messageMetadata as MessageMetadataWithStats | undefined)?.performance
       : undefined;
 
-  return extractOutputTokenCountFromUsage(usage ?? metadataUsage);
+  return {
+    outputTokens: extractOutputTokenCountFromUsage(usage ?? metadataUsage),
+    tokensPerSecond: metadataPerformance?.tokensPerSecond,
+  };
 }
 
-function extractOutputTokenCountFromMetadata(metadata: unknown) {
-  return extractOutputTokenCountFromUsage(
-    (metadata as MessageMetadataWithUsage | undefined)?.usage,
-  );
+function extractAssistantResponseStatsFromMetadata(metadata: unknown) {
+  const stats = metadata as MessageMetadataWithStats | undefined;
+
+  return {
+    outputTokens: extractOutputTokenCountFromUsage(stats?.usage),
+    tokensPerSecond: stats?.performance?.tokensPerSecond,
+  };
 }
 
 function extractOutputTokenCountFromUsage(usage: StreamUsage | undefined) {
@@ -893,6 +925,34 @@ function formatTokenCount(tokens: number | undefined) {
   }
 
   return `${tokens.toLocaleString()} ${tokens === 1 ? "token" : "tokens"}`;
+}
+
+function formatAssistantResponseStats(
+  stats: {
+    outputTokens: number | undefined;
+    tokensPerSecond: number | undefined;
+  },
+  mode: AssistantResponseStatsMode,
+) {
+  if (mode === "tokensPerSecond") {
+    return formatTokensPerSecond(stats.tokensPerSecond);
+  }
+
+  return formatTokenCount(stats.outputTokens);
+}
+
+function formatTokensPerSecond(tokensPerSecond: number | undefined) {
+  if (tokensPerSecond == null) {
+    return undefined;
+  }
+
+  return `${formatNumber(tokensPerSecond)} tok/s`;
+}
+
+function formatNumber(value: number) {
+  return Number.isInteger(value)
+    ? value.toLocaleString()
+    : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
 }
 
 export function parseKey(chunk: Buffer): TerminalKey {

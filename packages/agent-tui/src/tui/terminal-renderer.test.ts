@@ -54,13 +54,16 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("╭ User ");
   });
 
-  it("streams assistant text into a colored body card", async () => {
+  it("streams assistant text with tokens per second by default", async () => {
     const input = createInput();
     const output = createOutput();
     const renderer = new TerminalRenderer({ input, output });
 
     await renderer.renderStream(
-      createStream(["# Hello", "\n- there"], { outputTokens: 12 }) as never,
+      createStream(["# Hello", "\n- there"], {
+        outputTokens: 12,
+        tokensPerSecond: 12.25,
+      }) as never,
       {
         title: "Test",
         waitForExit: false,
@@ -68,10 +71,36 @@ describe("TerminalRenderer", () => {
     );
 
     expect(output.text()).toContain("\x1b[92m╭ Assistant ");
-    expect(stripAnsi(output.text())).toContain("12 tokens");
+    expect(stripAnsi(output.text())).toContain("12.3 tok/s");
     expect(stripAnsi(output.text())).toContain("│ │ █ Hello");
     expect(stripAnsi(output.text())).toContain("│ │ • there");
     expect(input.rawModes).toEqual([true, false]);
+  });
+
+  it("streams assistant text with token count when configured", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({
+      input,
+      output,
+      assistantResponseStats: "tokens",
+    });
+
+    await renderer.renderStream(
+      createStream(["hello"], {
+        outputTokens: 12,
+        tokensPerSecond: 12.25,
+      }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    const rendered = stripAnsi(output.text());
+
+    expect(rendered).toContain("12 tokens");
+    expect(rendered).not.toContain("12.3 tok/s");
   });
 
   it("renders submitted prompts as user cards before assistant output", async () => {
@@ -376,7 +405,10 @@ function createOutput() {
   return output;
 }
 
-function createStream(chunks: string[], usage?: { outputTokens: number }): AgentTUIStreamResult {
+function createStream(
+  chunks: string[],
+  stats?: { outputTokens: number; tokensPerSecond?: number },
+): AgentTUIStreamResult {
   return {
     uiMessageStream: (async function* () {
       yield { type: "start", messageId: "message-1" };
@@ -385,7 +417,14 @@ function createStream(chunks: string[], usage?: { outputTokens: number }): Agent
         yield { type: "text-delta", id: "text-1", delta: text };
       }
       yield { type: "text-end", id: "text-1" };
-      yield { type: "finish", usage };
+      yield {
+        type: "finish",
+        usage: stats == null ? undefined : { outputTokens: stats.outputTokens },
+        messageMetadata:
+          stats?.tokensPerSecond == null
+            ? undefined
+            : { performance: { tokensPerSecond: stats.tokensPerSecond } },
+      };
     })(),
   };
 }

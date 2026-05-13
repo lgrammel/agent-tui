@@ -1,6 +1,7 @@
 import type { RunAgentTUIOptions } from "./run-agent-tui";
 import {
   TerminalRenderer,
+  type AssistantResponseStatsMode,
   type TerminalInput,
   type TerminalOutput,
   type TerminalPartDisplayMode,
@@ -11,6 +12,7 @@ import {
   getToolName,
   isToolUIPart,
   type ModelMessage,
+  type StepResultPerformance,
   type TextStreamPart,
   type ToolSet,
   type UIMessage,
@@ -18,6 +20,7 @@ import {
 } from "ai";
 
 type AISDKAgent = Agent<any, any, any, any>;
+const defaultAssistantResponseStats: AssistantResponseStatsMode = "tokensPerSecond";
 
 export type AgentTUIStreamResult = {
   uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
@@ -60,6 +63,7 @@ export type AgentTUISessionOptions = {
   continueSession?: boolean;
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
+  assistantResponseStats?: AssistantResponseStatsMode;
 };
 
 export type AgentTUIToolApprovalRequest = {
@@ -106,6 +110,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #name: string;
   readonly #tools: TerminalPartDisplayMode;
   readonly #reasoning: TerminalPartDisplayMode;
+  readonly #assistantResponseStats: AssistantResponseStatsMode;
 
   constructor(options: AgentTUIRunnerOptions<TAgent>) {
     this.#agent = options.agent;
@@ -113,6 +118,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     this.#name = options.name;
     this.#tools = options.tools ?? "full";
     this.#reasoning = options.reasoning ?? "full";
+    this.#assistantResponseStats = options.assistantResponseStats ?? defaultAssistantResponseStats;
   }
 
   async run() {
@@ -165,6 +171,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           continueSession: Boolean(this.#renderer.readPrompt),
           tools: this.#tools,
           reasoning: this.#reasoning,
+          assistantResponseStats: this.#assistantResponseStats,
           waitForExit: false,
         });
 
@@ -230,9 +237,15 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 }
 
 function createDefaultRenderer(options: AgentTUIRunnerOptions) {
-  return options.tools === undefined && options.reasoning === undefined
+  return options.tools === undefined &&
+    options.reasoning === undefined &&
+    options.assistantResponseStats === undefined
     ? new TerminalRenderer()
-    : new TerminalRenderer({ tools: options.tools, reasoning: options.reasoning });
+    : new TerminalRenderer({
+        tools: options.tools,
+        reasoning: options.reasoning,
+        assistantResponseStats: options.assistantResponseStats,
+      });
 }
 
 function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | undefined {
@@ -247,6 +260,7 @@ function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | unde
   return new TerminalRenderer({
     tools: options.tools,
     reasoning: options.reasoning,
+    assistantResponseStats: options.assistantResponseStats,
     input: options.userInput,
     output: options.screen,
   });
@@ -292,6 +306,7 @@ async function* textStreamToUIMessageStream(
   const openTextParts = new Set<string>();
   const openReasoningParts = new Set<string>();
   const openToolCalls = new Set<string>();
+  let latestPerformance: StepResultPerformance | undefined;
   let sentFinish = false;
 
   yield {
@@ -495,6 +510,7 @@ async function* textStreamToUIMessageStream(
         yield { type: "start-step" };
         break;
       case "finish-step":
+        latestPerformance = part.performance;
         yield { type: "finish-step" };
         break;
       case "finish":
@@ -503,7 +519,7 @@ async function* textStreamToUIMessageStream(
         yield {
           type: "finish",
           finishReason: part.finishReason,
-          messageMetadata: createUsageMetadata(part.totalUsage.outputTokens),
+          messageMetadata: createResponseMetadata(part.totalUsage.outputTokens, latestPerformance),
         };
         break;
       case "abort":
@@ -521,8 +537,20 @@ async function* textStreamToUIMessageStream(
   }
 }
 
-function createUsageMetadata(outputTokens: number | undefined) {
-  return outputTokens == null ? undefined : { usage: { outputTokens } };
+function createResponseMetadata(
+  outputTokens: number | undefined,
+  performance?: StepResultPerformance,
+): ResponseMetadata | undefined {
+  if (outputTokens == null && performance?.tokensPerSecond == null) {
+    return undefined;
+  }
+
+  return {
+    ...(outputTokens == null ? {} : { usage: { outputTokens } }),
+    ...(performance?.tokensPerSecond == null
+      ? {}
+      : { performance: { tokensPerSecond: performance.tokensPerSecond } }),
+  };
 }
 
 function createMessageMetadata(options: { part: TextStreamPart<ToolSet> }) {
@@ -532,8 +560,15 @@ function createMessageMetadata(options: { part: TextStreamPart<ToolSet> }) {
     return undefined;
   }
 
-  return createUsageMetadata(part.totalUsage.outputTokens);
+  return createResponseMetadata(part.totalUsage.outputTokens);
 }
+
+type ResponseMetadata = {
+  usage?: {
+    outputTokens: number;
+  };
+  performance?: Pick<StepResultPerformance, "tokensPerSecond">;
+};
 
 function* closeOpenParts(textPartIds: Set<string>, reasoningPartIds: Set<string>) {
   for (const id of textPartIds) {

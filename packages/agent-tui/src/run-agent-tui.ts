@@ -1,5 +1,5 @@
 import { AgentTUIRunner } from "./agent-tui-runner";
-import type { TerminalPartDisplayMode } from "./tui/terminal-renderer";
+import type { AssistantResponseStatsMode, TerminalPartDisplayMode } from "./tui/terminal-renderer";
 import type { Agent } from "ai";
 
 /**
@@ -27,6 +27,13 @@ export type RunAgentTUIOptions<
    * How reasoning parts should render.
    */
   reasoning?: TerminalPartDisplayMode;
+
+  /**
+   * Which statistic to show in assistant response headers.
+   *
+   * @default "tokensPerSecond"
+   */
+  assistantResponseStats?: AssistantResponseStatsMode;
 };
 
 /**

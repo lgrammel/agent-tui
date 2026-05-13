@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AgentTUIAgent,
   AgentTUIRenderer,
+  AgentTUISessionOptions,
   AgentTUIStreamOptions,
   AgentTUIToolApprovalRequest,
   AgentTUIToolApprovalResponse,
@@ -68,6 +69,25 @@ describe("runAgentTUI", () => {
     });
 
     expect(terminalRendererOptions).toEqual([{ tools: "collapsed", reasoning: "hidden" }]);
+  });
+
+  it("passes assistant response stats mode to the default terminal renderer", async () => {
+    useRenderer(
+      createRenderer({
+        prompts: [undefined],
+      }),
+    );
+    const agent = createAISDKAgent();
+
+    await runAgentTUI({
+      agent,
+      name: "Test Agent",
+      assistantResponseStats: "tokensPerSecond",
+    });
+
+    expect(terminalRendererOptions).toEqual([
+      { assistantResponseStats: "tokensPerSecond", reasoning: undefined, tools: undefined },
+    ]);
   });
 });
 
@@ -215,6 +235,39 @@ describe("AgentTUIRunner", () => {
     expect(renderer.submittedPrompts).toEqual(["hello"]);
     expect(renderer.titles).toEqual(["Test Agent", "Test Agent", "Test Agent"]);
   });
+
+  it("defaults assistant response stats mode to tokens per second", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["hello", undefined],
+      }),
+    );
+    const agent = createAgent(streamCalls);
+
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
+
+    expect(renderer.assistantResponseStats).toEqual(["tokensPerSecond"]);
+  });
+
+  it("passes assistant response stats mode to stream rendering", async () => {
+    const streamCalls: AgentTUIStreamOptions[] = [];
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["hello", undefined],
+      }),
+    );
+    const agent = createAgent(streamCalls);
+
+    await new AgentTUIRunner({
+      agent,
+      name: "Test Agent",
+      assistantResponseStats: "tokens",
+    }).run();
+
+    expect(renderer.assistantResponseStats).toEqual(["tokens"]);
+  });
+
   it("accepts an injected renderer", async () => {
     const streamCalls: AgentTUIStreamOptions[] = [];
     const renderer = createRenderer({
@@ -278,6 +331,7 @@ function createAISDKAgent(): Agent<any, any, any, any> {
 type TestRenderer = AgentTUIRenderer & {
   submittedPrompts: string[];
   titles: string[];
+  assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]>;
   toolApprovalRequests: AgentTUIToolApprovalRequest[];
 };
 
@@ -293,11 +347,13 @@ function createRenderer(options: {
 }): TestRenderer {
   const submittedPrompts: string[] = [];
   const titles: string[] = [];
+  const assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]> = [];
   const toolApprovalRequests: AgentTUIToolApprovalRequest[] = [];
 
   return {
     submittedPrompts,
     titles,
+    assistantResponseStats,
     toolApprovalRequests,
     async readPrompt(sessionOptions) {
       if (sessionOptions?.title) {
@@ -328,6 +384,8 @@ function createRenderer(options: {
       if (sessionOptions?.submittedPrompt) {
         submittedPrompts.push(sessionOptions.submittedPrompt);
       }
+
+      assistantResponseStats.push(sessionOptions?.assistantResponseStats);
 
       let responseMessage: UIMessage | undefined;
 
