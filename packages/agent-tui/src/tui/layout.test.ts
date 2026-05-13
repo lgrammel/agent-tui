@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampScrollOffset, renderScreen, stripAnsi, visibleLength, wrapText } from "./layout";
+import {
+  clampScrollOffset,
+  renderScreen,
+  renderScreenLines,
+  stripAnsi,
+  visibleLength,
+  wrapText,
+} from "./layout";
 
 describe("wrapText", () => {
   it("wraps text at word boundaries", () => {
@@ -75,6 +82,21 @@ describe("renderScreen", () => {
     expect(output).toContain("│ two                  │");
     expect(output).toContain("│ four                 │");
     expect(output).not.toContain("│ six                │");
+  });
+
+  it("renders precomputed body lines without reprocessing markdown", () => {
+    const output = renderScreenLines({
+      width: 30,
+      height: 8,
+      title: "Chat",
+      bodyLines: ["# kept literal", "already wrapped"],
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+
+    expect(output).toContain("│ # kept literal             │");
+    expect(output).toContain("│ already wrapped            │");
   });
 
   it("pads ANSI colored body lines by visible width", () => {

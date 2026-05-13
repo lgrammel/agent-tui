@@ -17,19 +17,43 @@ export type TUIScreenState = {
   status?: string;
 };
 
+export type TUIScreenLinesState = Omit<TUIScreenState, "body"> & {
+  bodyLines: string[];
+};
+
+export type TUIScreenViewportState = Omit<TUIScreenLinesState, "bodyLines" | "scrollOffset"> & {
+  visibleBodyLines: string[];
+};
+
 export function renderScreen(state: TUIScreenState): string {
+  const width = Math.max(20, state.width);
+  const contentWidth = width - 4;
+  const bodyLines = wrapText(renderMarkdown(state.body), contentWidth);
+
+  return renderScreenLines({ ...state, bodyLines });
+}
+
+export function renderScreenLines(state: TUIScreenLinesState): string {
+  const height = Math.max(8, state.height);
+  const inputHeight = 3;
+  const bodyHeight = height - inputHeight;
+  const bodyContentHeight = bodyHeight - 2;
+
+  const maxScrollOffset = Math.max(0, state.bodyLines.length - bodyContentHeight);
+  const scrollOffset = Math.min(Math.max(0, state.scrollOffset), maxScrollOffset);
+  const start = Math.max(0, state.bodyLines.length - bodyContentHeight - scrollOffset);
+  const visibleBody = state.bodyLines.slice(start, start + bodyContentHeight);
+
+  return renderScreenViewport({ ...state, visibleBodyLines: visibleBody });
+}
+
+export function renderScreenViewport(state: TUIScreenViewportState): string {
   const width = Math.max(20, state.width);
   const height = Math.max(8, state.height);
   const inputHeight = 3;
   const bodyHeight = height - inputHeight;
-  const contentWidth = width - 4;
   const bodyContentHeight = bodyHeight - 2;
-
-  const bodyLines = wrapText(renderMarkdown(state.body), contentWidth);
-  const maxScrollOffset = Math.max(0, bodyLines.length - bodyContentHeight);
-  const scrollOffset = Math.min(Math.max(0, state.scrollOffset), maxScrollOffset);
-  const start = Math.max(0, bodyLines.length - bodyContentHeight - scrollOffset);
-  const visibleBody = bodyLines.slice(start, start + bodyContentHeight);
+  const visibleBody = state.visibleBodyLines.slice(0, bodyContentHeight);
 
   while (visibleBody.length < bodyContentHeight) {
     visibleBody.push("");

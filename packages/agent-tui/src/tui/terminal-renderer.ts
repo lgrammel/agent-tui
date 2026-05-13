@@ -3,7 +3,7 @@ import type {
   AgentTUIToolApprovalRequest,
   AgentTUIToolApprovalResponse,
 } from "../agent-tui-runner";
-import { clampScrollOffset, renderScreen, sliceVisible, visibleLength } from "./layout";
+import { renderScreenViewport, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
 import { TerminalFrameBuffer } from "./terminal-frame-buffer";
 import {
@@ -81,6 +81,17 @@ type ChatSection = {
   content: string;
   collapsed?: boolean;
   id?: string;
+  cache?: RenderedSectionCache;
+};
+
+type RenderedSectionCache = {
+  width: number;
+  kind: ChatSectionKind;
+  title: string;
+  rightTitle?: string;
+  content: string;
+  collapsed: boolean;
+  lines: string[];
 };
 
 type StreamUsage = {
@@ -390,13 +401,7 @@ export class TerminalRenderer {
 
   #handleScroll(direction: "up" | "down") {
     const delta = direction === "up" ? 1 : -1;
-    const bodyHeight = this.#height() - 3;
-    this.#scrollOffset = clampScrollOffset(
-      this.#scrollOffset + delta,
-      this.#body(),
-      bodyHeight,
-      this.#width(),
-    );
+    this.#scrollOffset = this.#clampScrollOffset(this.#scrollOffset + delta);
     this.#paint();
   }
 
@@ -526,10 +531,13 @@ export class TerminalRenderer {
       : undefined;
 
     if (existingSection) {
+      const cache = existingSection.cache;
       existingSection.kind = section.kind;
       existingSection.title = section.title;
       existingSection.rightTitle = section.rightTitle;
       existingSection.content = section.content;
+      existingSection.collapsed = section.collapsed;
+      existingSection.cache = cache && sectionMatchesCache(section, cache) ? cache : undefined;
       return;
     }
 
@@ -568,32 +576,22 @@ export class TerminalRenderer {
   }
 
   #paintAfterBodyChange() {
-    const body = this.#body();
-
-    if (this.#scrollOffset === 0) {
-      this.#paint();
-      return;
+    if (this.#scrollOffset !== 0) {
+      this.#scrollOffset = this.#clampScrollOffset(this.#scrollOffset);
     }
 
-    this.#scrollOffset = clampScrollOffset(
-      this.#scrollOffset,
-      body,
-      this.#height() - 3,
-      this.#width(),
-    );
     this.#paint();
   }
 
   #paint() {
-    const frame = renderScreen({
+    const frame = renderScreenViewport({
       width: this.#width(),
       height: this.#height(),
       title: this.#title,
-      body: this.#body() || "Waiting for input...",
+      visibleBodyLines: this.#visibleBodyLines(),
       input: this.#inputText,
       inputActive: this.#inputActive,
       inputCursorVisible: this.#inputCursorVisible,
-      scrollOffset: this.#scrollOffset,
       status: this.#status,
     });
 
@@ -605,8 +603,59 @@ export class TerminalRenderer {
     this.#paint();
   }
 
-  #body() {
-    return this.#sections.map((section) => renderSection(section, this.#width() - 4)).join("\n");
+  #visibleBodyLines() {
+    if (this.#sections.length === 0) {
+      return ["Waiting for input..."];
+    }
+
+    const bodyContentHeight = this.#bodyContentHeight();
+    const totalLineCount = this.#bodyLineCount();
+    const start = Math.max(0, totalLineCount - bodyContentHeight - this.#scrollOffset);
+    const end = start + bodyContentHeight;
+    const visibleLines: string[] = [];
+    let sectionStart = 0;
+
+    for (const section of this.#sections) {
+      const sectionLines = renderSectionLines(section, this.#width() - 4);
+      const sectionEnd = sectionStart + sectionLines.length;
+
+      if (sectionEnd > start && sectionStart < end) {
+        visibleLines.push(
+          ...sectionLines.slice(Math.max(0, start - sectionStart), end - sectionStart),
+        );
+      }
+
+      if (visibleLines.length >= bodyContentHeight) {
+        break;
+      }
+
+      sectionStart = sectionEnd;
+    }
+
+    return visibleLines;
+  }
+
+  #clampScrollOffset(scrollOffset: number) {
+    const maxScrollOffset = Math.max(0, this.#bodyLineCount() - this.#bodyContentHeight());
+
+    return Math.min(Math.max(0, scrollOffset), maxScrollOffset);
+  }
+
+  #bodyLineCount() {
+    if (this.#sections.length === 0) {
+      return 1;
+    }
+
+    let count = 0;
+    for (const section of this.#sections) {
+      count += renderSectionLines(section, this.#width() - 4).length;
+    }
+
+    return count;
+  }
+
+  #bodyContentHeight() {
+    return Math.max(1, this.#height() - 5);
   }
 
   #width() {
@@ -825,7 +874,41 @@ async function* iterateUIMessageStream(
   yield* stream;
 }
 
-function renderSection(section: ChatSection, width: number) {
+function renderSectionLines(section: ChatSection, width: number) {
+  if (section.cache && sectionMatchesCache(section, section.cache, width)) {
+    return section.cache.lines;
+  }
+
+  const lines = createSectionLines(section, width);
+  section.cache = {
+    width,
+    kind: section.kind,
+    title: section.title,
+    rightTitle: section.rightTitle,
+    content: section.content,
+    collapsed: section.collapsed === true,
+    lines,
+  };
+
+  return lines;
+}
+
+function sectionMatchesCache(
+  section: ChatSection,
+  cache: RenderedSectionCache,
+  width = cache.width,
+) {
+  return (
+    cache.width === width &&
+    cache.kind === section.kind &&
+    cache.title === section.title &&
+    cache.rightTitle === section.rightTitle &&
+    cache.content === section.content &&
+    cache.collapsed === (section.collapsed === true)
+  );
+}
+
+function createSectionLines(section: ChatSection, width: number) {
   const style = sectionStyles[section.kind];
   const contentWidth = Math.max(1, width - 4);
   const title = ` ${section.title} `;
@@ -836,7 +919,7 @@ function renderSection(section: ChatSection, width: number) {
     const top = `${style.color}╭${title}${style.border.repeat(borderWidth)}${rightTitle}╮${colors.reset}`;
     const bottom = `${style.color}╰${style.border.repeat(Math.max(0, width - 2))}╯${colors.reset}`;
 
-    return [top, bottom].join("\n");
+    return [top, bottom];
   }
 
   const borderWidth = Math.max(0, width - 2 - title.length - rightTitle.length);
@@ -848,9 +931,7 @@ function renderSection(section: ChatSection, width: number) {
       : colors.dim + "(streaming...)" + colors.reset;
   const lines = content.split("\n").flatMap((line) => wrapVisibleLine(line, contentWidth));
 
-  return [top, ...lines.map((line) => sectionLine(line, contentWidth, style.color)), bottom].join(
-    "\n",
-  );
+  return [top, ...lines.map((line) => sectionLine(line, contentWidth, style.color)), bottom];
 }
 
 function sectionLine(line: string, contentWidth: number, color: string) {
