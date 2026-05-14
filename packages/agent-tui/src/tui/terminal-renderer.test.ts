@@ -137,6 +137,30 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("what now?");
   });
 
+  it("keeps processing status until the first visible assistant chunk arrives", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const nextChunk = createDeferred<void>();
+    const renderer = new TerminalRenderer({ input, output });
+    const renderPromise = renderer.renderStream(
+      createDelayedTextStream(nextChunk.promise) as never,
+      {
+        title: "Test",
+        submittedPrompt: "what now?",
+        waitForExit: false,
+      },
+    );
+
+    await Promise.resolve();
+    expect(stripAnsi(output.text())).toContain("Processing input...");
+    expect(stripAnsi(output.text())).not.toContain("Streaming...");
+
+    nextChunk.resolve();
+    await renderPromise;
+
+    expect(stripAnsi(output.text())).toContain("Streaming...");
+  });
+
   it("renders reasoning and tool parts as distinct colored cards", async () => {
     const input = createInput();
     const output = createOutput();
@@ -471,6 +495,19 @@ function createStream(
             ? undefined
             : { performance: { tokensPerSecond: stats.tokensPerSecond } },
       };
+    })(),
+  };
+}
+
+function createDelayedTextStream(nextChunk: Promise<void>): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      await nextChunk;
+      yield { type: "text-start", id: "text-1" };
+      yield { type: "text-delta", id: "text-1", delta: "hello" };
+      yield { type: "text-end", id: "text-1" };
+      yield { type: "finish" };
     })(),
   };
 }

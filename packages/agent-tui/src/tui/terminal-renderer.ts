@@ -126,6 +126,8 @@ const sectionStyles: Record<ChatSectionKind, { color: string; border: string }> 
 };
 
 const inputCursorBlinkMs = 500;
+const processingStatus = "Processing input... ↑/↓ scroll · Ctrl+C quit";
+const streamingStatus = "Streaming... ↑/↓ scroll · Ctrl+C quit";
 
 export class TerminalRenderer {
   readonly #input: TerminalInput;
@@ -140,7 +142,7 @@ export class TerminalRenderer {
   #inputActive = false;
   #scrollOffset = 0;
   #title = "Agent TUI";
-  #status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
+  #status = streamingStatus;
   #isInteractive = false;
   #interrupted = false;
   #totalTokens?: number;
@@ -188,8 +190,8 @@ export class TerminalRenderer {
             const prompt = this.#inputText;
             this.#inputActive = false;
             this.#stopInputCursorBlink();
+            this.#status = processingStatus;
             this.#addUserSection(prompt);
-            this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
             this.#inputText = "";
             this.#paint();
             this.#detachInput();
@@ -222,9 +224,9 @@ export class TerminalRenderer {
     options?: TerminalSessionOptions,
   ): Promise<UIMessage | undefined> {
     this.#start(options);
-    this.#addSubmittedPrompt(options?.submittedPrompt);
     this.#inputActive = false;
-    this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
+    this.#status = processingStatus;
+    this.#addSubmittedPrompt(options?.submittedPrompt);
     this.#interrupted = false;
     this.#totalTokens = undefined;
     this.#assistantOutputTokens = undefined;
@@ -307,12 +309,12 @@ export class TerminalRenderer {
             const value = key.value.toLowerCase();
 
             if (value === "y") {
-              this.#status = "Approved · Streaming... ↑/↓ scroll · Ctrl+C quit";
+              this.#status = "Approved · Processing input... ↑/↓ scroll · Ctrl+C quit";
               this.#detachInput();
               this.#paint();
               resolve({ approved: true });
             } else if (value === "n") {
-              this.#status = "Denied · Streaming... ↑/↓ scroll · Ctrl+C quit";
+              this.#status = "Denied · Processing input... ↑/↓ scroll · Ctrl+C quit";
               this.#detachInput();
               this.#paint();
               resolve({ approved: false, reason: "Denied by user." });
@@ -575,6 +577,11 @@ export class TerminalRenderer {
     stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
   ): AsyncIterable<UIMessageChunk> {
     for await (const chunk of iterateUIMessageStream(stream)) {
+      if (startsVisibleAssistantStream(chunk) && this.#status !== streamingStatus) {
+        this.#status = streamingStatus;
+        this.#paint();
+      }
+
       if (chunk.type === "error") {
         this.#addErrorSection("Error", chunk.errorText);
       }
@@ -828,6 +835,21 @@ function renderToolInvocation(
         rightTitle: status,
         content: `${inputText}\n\nReason: ${part.approval.reason ?? "denied"}`,
       };
+  }
+}
+
+function startsVisibleAssistantStream(chunk: UIMessageChunk) {
+  switch (chunk.type) {
+    case "text-start":
+    case "text-delta":
+    case "reasoning-start":
+    case "reasoning-delta":
+    case "tool-input-start":
+    case "tool-input-delta":
+    case "tool-input-available":
+      return true;
+    default:
+      return false;
   }
 }
 
