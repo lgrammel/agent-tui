@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "check": "bun run format:check && bun run lint",
+    "changeset": "changeset",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",
@@ -15,10 +16,13 @@
     "package:pack:dry-run": "bun run --cwd packages/agent-tui pack:dry-run",
     "package:release:dry-run": "bun run --cwd packages/agent-tui release:dry-run",
     "package:release": "bun run --cwd packages/agent-tui release",
+    "release": "bun run package:build && changeset publish",
     "test": "vitest run --typecheck",
+    "version-packages": "changeset version",
     "weather": "bun run --cwd examples/basic weather"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/bun": "latest",
     "@types/node": "^25.6.2",
     "oxfmt": "^0.48.0",
