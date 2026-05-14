@@ -186,6 +186,55 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("Streaming...");
   });
 
+  it("only follows new output while already scrolled to the bottom", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const frameBuffer = createFrameBuffer();
+    const secondChunk = createDeferred<void>();
+    const secondChunkConsumed = createDeferred<void>();
+    const thirdChunk = createDeferred<void>();
+    output.rows = 10;
+    const renderer = new TerminalRenderer({ input, output, frameBuffer });
+    const renderPromise = renderer.renderStream(
+      createPausedTextStream({
+        firstText: "one\ntwo\nthree\nfour\nfive",
+        secondText: "\nsix\nseven",
+        thirdText: "\neight",
+        secondChunk: secondChunk.promise,
+        onSecondChunkConsumed: secondChunkConsumed.resolve,
+        thirdChunk: thirdChunk.promise,
+      }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    await waitForFrameText(frameBuffer, "five");
+    input.emit("data", Buffer.from("\x1B[A"));
+    await waitForFrameText(frameBuffer, "three");
+
+    secondChunk.resolve();
+    await secondChunkConsumed.promise;
+
+    const scrolledFrame = stripAnsi(frameBuffer.text());
+    expect(scrolledFrame).toContain("three");
+    expect(scrolledFrame).toContain("five");
+    expect(scrolledFrame).not.toContain("seven");
+
+    input.emit("data", Buffer.from("\x1B[B"));
+    input.emit("data", Buffer.from("\x1B[B"));
+    input.emit("data", Buffer.from("\x1B[B"));
+    await waitForFrameText(frameBuffer, "seven");
+
+    thirdChunk.resolve();
+    await renderPromise;
+
+    const bottomFrame = stripAnsi(frameBuffer.lastPresentedText());
+    expect(bottomFrame).toContain("eight");
+    expect(bottomFrame).not.toContain("three");
+  });
+
   it("shows tool execution and tool-result processing statuses before streaming", async () => {
     const input = createInput();
     const output = createOutput();
@@ -671,6 +720,37 @@ async function waitForFrameText(frameBuffer: TestFrameBuffer, text: string) {
   }
 
   expect(stripAnsi(frameBuffer.text())).toContain(text);
+}
+
+function createPausedTextStream({
+  firstText,
+  secondText,
+  thirdText,
+  secondChunk,
+  onSecondChunkConsumed,
+  thirdChunk,
+}: {
+  firstText: string;
+  secondText: string;
+  thirdText: string;
+  secondChunk: Promise<void>;
+  onSecondChunkConsumed?: () => void;
+  thirdChunk: Promise<void>;
+}): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield { type: "text-start", id: "text-1" };
+      yield { type: "text-delta", id: "text-1", delta: firstText };
+      await secondChunk;
+      yield { type: "text-delta", id: "text-1", delta: secondText };
+      onSecondChunkConsumed?.();
+      await thirdChunk;
+      yield { type: "text-delta", id: "text-1", delta: thirdText };
+      yield { type: "text-end", id: "text-1" };
+      yield { type: "finish" };
+    })(),
+  };
 }
 
 function createStream(

@@ -470,8 +470,9 @@ export class TerminalRenderer {
   }
 
   #addUserSection(prompt: string) {
+    const previousBodyLineCount = this.#bodyLineCount();
     this.#sections.push({ kind: "user", title: "User", content: prompt });
-    this.#paintAfterBodyChange();
+    this.#paintAfterBodyChange(previousBodyLineCount);
   }
 
   #renderAssistantMessage(
@@ -482,6 +483,7 @@ export class TerminalRenderer {
       assistantResponseStats: AssistantResponseStatsMode;
     },
   ) {
+    const previousBodyLineCount = this.#bodyLineCount();
     const activeSectionIds = new Set<string>();
     const metadataStats = extractAssistantResponseStatsFromMetadata(message.metadata);
     this.#totalTokens = metadataStats.totalTokens ?? this.#totalTokens;
@@ -554,7 +556,7 @@ export class TerminalRenderer {
     }
 
     this.#removeStaleAssistantSections(message.id, activeSectionIds);
-    this.#paintAfterBodyChange();
+    this.#paintAfterBodyChange(previousBodyLineCount);
   }
 
   #upsertSection(section: ChatSection) {
@@ -622,13 +624,15 @@ export class TerminalRenderer {
   }
 
   #addErrorSection(title: string, content: string) {
+    const previousBodyLineCount = this.#bodyLineCount();
     this.#sections.push({ kind: "error", title, content });
-    this.#paintAfterBodyChange();
+    this.#paintAfterBodyChange(previousBodyLineCount);
   }
 
-  #paintAfterBodyChange() {
+  #paintAfterBodyChange(previousBodyLineCount: number) {
     if (this.#scrollOffset !== 0) {
-      this.#scrollOffset = this.#clampScrollOffset(this.#scrollOffset);
+      const bodyLineDelta = this.#bodyLineCount() - previousBodyLineCount;
+      this.#scrollOffset = this.#clampScrollOffset(this.#scrollOffset + bodyLineDelta);
     }
 
     this.#paint();
