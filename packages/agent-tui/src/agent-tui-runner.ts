@@ -22,6 +22,7 @@ const defaultAssistantResponseStats: AssistantResponseStatsMode = "tokensPerSeco
 export type AgentTUIStreamResult = {
   uiMessageStream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>;
   message?: UIMessage;
+  abort?: () => void;
 };
 
 export type AgentTUIStreamOptions = {
@@ -187,13 +188,16 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     messages: UIMessage[],
     generateMessageId: () => string,
   ): Promise<AgentTUIStreamResult> {
+    const abortController = new AbortController();
     const result = await this.#agent.stream({
       prompt: await convertToModelMessages(messages, { tools: this.#agent.tools }),
+      abortSignal: abortController.signal,
     });
 
     return {
       uiMessageStream: textStreamToUIMessageStream(result.fullStream, generateMessageId, messages),
       message: lastAssistantMessage(messages),
+      abort: () => abortController.abort(),
     };
   }
 }

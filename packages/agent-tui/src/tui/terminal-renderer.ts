@@ -146,6 +146,7 @@ export class TerminalRenderer {
   #inputCursorTimer?: ReturnType<typeof setInterval>;
   #onData?: (chunk: Buffer) => void;
   #onResize?: () => void;
+  #resolveStreamInterrupt?: () => void;
 
   constructor(options?: TerminalRendererOptions) {
     this.#input = options?.input ?? process.stdin;
@@ -229,16 +230,22 @@ export class TerminalRenderer {
       assistantResponseStats: options?.assistantResponseStats ?? this.#assistantResponseStats,
     };
     this.#paint();
+    const streamInterrupted = new Promise<void>((resolve) => {
+      this.#resolveStreamInterrupt = resolve;
+    });
     this.#onData = (chunk) => this.#handleStreamingKey(chunk);
     this.#attachInput();
     let responseMessage: UIMessage | undefined;
+    const stream = toReadableStream(this.#observeUIMessageStream(result.uiMessageStream));
 
     try {
-      for await (const message of readUIMessageStream({
+      const messages = readUIMessageStream({
         message: result.message,
-        stream: toReadableStream(this.#observeUIMessageStream(result.uiMessageStream)),
+        stream,
         onError: (error) => this.#addErrorSection("Error", formatStreamError(error)),
-      })) {
+      });
+
+      for await (const message of takeUntil(messages, streamInterrupted)) {
         if (this.#interrupted) {
           break;
         }
@@ -251,6 +258,10 @@ export class TerminalRenderer {
         this.#renderAssistantMessage(responseMessage, displayModes);
       }
     } finally {
+      this.#resolveStreamInterrupt = undefined;
+      if (this.#interrupted) {
+        result.abort?.();
+      }
       this.#detachInput();
       this.#status = this.#interrupted
         ? "Interrupted"
@@ -393,6 +404,7 @@ export class TerminalRenderer {
         break;
       case "ctrl-c":
         this.#interrupted = true;
+        this.#resolveStreamInterrupt?.();
         break;
       default:
         break;
@@ -706,6 +718,23 @@ export class TerminalRenderer {
 
 function interruptedError() {
   return new Error("Interrupted");
+}
+
+async function* takeUntil<T>(source: AsyncIterable<T>, stop: Promise<void>): AsyncIterable<T> {
+  const iterator = source[Symbol.asyncIterator]();
+  const stopped = stop.then(
+    () => ({ done: true, value: undefined as T }) satisfies IteratorResult<T>,
+  );
+
+  while (true) {
+    const nextValue = await Promise.race([iterator.next(), stopped]);
+
+    if (nextValue.done) {
+      break;
+    }
+
+    yield nextValue.value;
+  }
 }
 
 function formatStreamError(error: unknown) {

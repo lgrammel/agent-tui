@@ -264,6 +264,27 @@ describe("TerminalRenderer", () => {
     expect(output.text()).toContain("Bad API key");
   });
 
+  it("interrupts streaming immediately while waiting for the next chunk", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const abort = createDeferred<void>();
+    const started = createDeferred<void>();
+    const renderer = new TerminalRenderer({ input, output });
+    const renderPromise = renderer.renderStream(
+      createWaitingStream(started.resolve, abort.resolve) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    await started.promise;
+    input.emit("data", Buffer.from("\u0003"));
+
+    await expect(renderPromise).rejects.toThrow("Interrupted");
+    expect(stripAnsi(output.text())).toContain("Interrupted");
+  });
+
   it("reads tool approval decisions from the status prompt", async () => {
     const input = createInput();
     const output = createOutput();
@@ -506,4 +527,34 @@ function createErrorStream(error: unknown): AgentTUIStreamResult {
       };
     })(),
   };
+}
+
+function createWaitingStream(onStart: () => void, onAbort: () => void): AgentTUIStreamResult {
+  return {
+    uiMessageStream: new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "start", messageId: "message-1" });
+        controller.enqueue({
+          type: "tool-input-available",
+          toolCallId: "call-1",
+          toolName: "weather",
+          input: { city: "Berlin" },
+        });
+        onStart();
+      },
+      cancel: onAbort,
+    }),
+    abort: onAbort,
+  };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
 }

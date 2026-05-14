@@ -109,11 +109,7 @@ describe("AgentTUIRunner", () => {
 
     await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
-    expect(streamCalls).toEqual([
-      {
-        prompt: [createUserModelMessage("hello")],
-      },
-    ]);
+    expectStreamCalls(streamCalls, [[createUserModelMessage("hello")]]);
     expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
 
@@ -128,17 +124,13 @@ describe("AgentTUIRunner", () => {
 
     await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
-    expect(streamCalls).toEqual([
-      {
-        prompt: [createUserModelMessage("first")],
-      },
-      {
-        prompt: [
-          createUserModelMessage("first"),
-          createAssistantModelMessage("response to first"),
-          createUserModelMessage("second"),
-        ],
-      },
+    expectStreamCalls(streamCalls, [
+      [createUserModelMessage("first")],
+      [
+        createUserModelMessage("first"),
+        createAssistantModelMessage("response to first"),
+        createUserModelMessage("second"),
+      ],
     ]);
     expect(renderer.submittedPrompts).toEqual(["first", "second"]);
   });
@@ -154,18 +146,14 @@ describe("AgentTUIRunner", () => {
 
     await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
-    expect(streamCalls).toEqual([
-      {
-        prompt: [createUserModelMessage("weather")],
-      },
-      {
-        prompt: [
-          createUserModelMessage("weather"),
-          createAssistantModelMessageWithToolInvocation(),
-          createToolModelMessageWithToolInvocation(),
-          createUserModelMessage("next"),
-        ],
-      },
+    expectStreamCalls(streamCalls, [
+      [createUserModelMessage("weather")],
+      [
+        createUserModelMessage("weather"),
+        createAssistantModelMessageWithToolInvocation(),
+        createToolModelMessageWithToolInvocation(),
+        createUserModelMessage("next"),
+      ],
     ]);
   });
 
@@ -181,17 +169,13 @@ describe("AgentTUIRunner", () => {
 
     await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
 
-    expect(streamCalls).toEqual([
-      {
-        prompt: [createUserModelMessage("run command")],
-      },
-      {
-        prompt: [
-          createUserModelMessage("run command"),
-          createAssistantModelMessageWithToolApproval(),
-          createToolModelMessageWithToolApproval(true),
-        ],
-      },
+    expectStreamCalls(streamCalls, [
+      [createUserModelMessage("run command")],
+      [
+        createUserModelMessage("run command"),
+        createAssistantModelMessageWithToolApproval(),
+        createToolModelMessageWithToolApproval(true),
+      ],
     ]);
     expect(renderer.toolApprovalRequests).toEqual([
       expect.objectContaining({
@@ -280,11 +264,7 @@ describe("AgentTUIRunner", () => {
 
     await new AgentTUIRunner({ agent, name: "Test Agent", renderer }).run();
 
-    expect(streamCalls).toEqual([
-      {
-        prompt: [createUserModelMessage("hello")],
-      },
-    ]);
+    expectStreamCalls(streamCalls, [[createUserModelMessage("hello")]]);
     expect(terminalRendererOptions).toEqual([]);
     expect(renderer.submittedPrompts).toEqual(["hello"]);
   });
@@ -362,6 +342,15 @@ function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): T
   testRenderer = renderer;
 
   return renderer;
+}
+
+function expectStreamCalls(calls: AgentTUIStreamCall[], prompts: ModelMessage[][]) {
+  expect(calls).toHaveLength(prompts.length);
+
+  for (const [index, prompt] of prompts.entries()) {
+    expect(calls[index]?.prompt).toEqual(prompt);
+    expect(calls[index]?.abortSignal).toBeInstanceOf(AbortSignal);
+  }
 }
 
 function createRenderer(options: {
@@ -474,6 +463,7 @@ function createAssistantModelMessageWithToolInvocation(): ModelMessage {
         toolCallId: "call-1",
         toolName: "weather",
         input: { city: "Berlin" },
+        providerExecuted: undefined,
       },
       { type: "text", text: "Berlin is snowy and 72F." },
     ],
@@ -506,11 +496,13 @@ function createAssistantModelMessageWithToolApproval(): ModelMessage {
         toolCallId: "call-1",
         toolName: "shell",
         input: { command: "date" },
+        providerExecuted: undefined,
       },
       {
         type: "tool-approval-request",
         approvalId: "approval-1",
         toolCallId: "call-1",
+        isAutomatic: undefined,
       },
     ],
   };
@@ -524,6 +516,8 @@ function createToolModelMessageWithToolApproval(approved: boolean): ModelMessage
         type: "tool-approval-response",
         approvalId: "approval-1",
         approved,
+        reason: undefined,
+        providerExecuted: undefined,
       },
     ],
   };
