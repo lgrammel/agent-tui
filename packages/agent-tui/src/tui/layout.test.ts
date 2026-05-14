@@ -53,6 +53,21 @@ describe("renderScreen", () => {
     expect(output).toContain("│ > question█                │");
   });
 
+  it("renders a right-aligned outer frame title", () => {
+    const output = renderScreen({
+      width: 30,
+      height: 8,
+      title: "Chat",
+      rightTitle: "13 tokens",
+      body: "Hello",
+      input: "",
+      inputActive: false,
+      scrollOffset: 0,
+    });
+
+    expect(output).toContain("┌ Chat ─────────── 13 tokens ┐");
+  });
+
   it("renders a blank cursor during the hidden blink phase", () => {
     const output = renderScreen({
       width: 30,

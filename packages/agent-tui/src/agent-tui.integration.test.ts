@@ -93,7 +93,7 @@ describe("AgentTUIRunner integration", () => {
       await screen.waitForText("Berlin is sunny and 72F.");
       await screen.waitForText("┌ Input");
       expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
-        "┌ Weather Agent ─────────────────────────────────────┐
+        "┌ Weather Agent ────────────────────────── 13 tokens ┐
         │ │ {                                              │ │
         │ │   "city": "Berlin",                            │ │
         │ │   "temperature": 72,                           │ │
@@ -112,7 +112,7 @@ describe("AgentTUIRunner integration", () => {
       screen.resize(64, 16);
       await screen.waitForText("┌ Weather Agent");
       expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
-        "┌ Weather Agent ───────────────────────────────────────────────┐
+        "┌ Weather Agent ──────────────────────────────────── 13 tokens ┐
         │ │                                                          │ │
         │ │ Output:                                                  │ │
         │ │ {                                                        │ │
@@ -231,7 +231,7 @@ describe("AgentTUIRunner integration", () => {
       await screen.waitForText("┌ Input");
 
       expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
-        "┌ Weather Agent ───────────────────────────────────────────────────────┐
+        "┌ Weather Agent ──────────────────────────────────────────── 13 tokens ┐
         │ ╭ Tool · weather ──────────────────────────────────────────── done ╮ │
         │ │ Input:                                                           │ │
         │ │ {                                                                │ │
@@ -285,7 +285,7 @@ describe("AgentTUIRunner integration", () => {
       await screen.waitForText("┌ Input");
 
       expect(normalizeTokensPerSecond(screen.snapshot())).toMatchInlineSnapshot(`
-        "┌ Test Agent ──────────────────────────────────────────────────────────┐
+        "┌ Test Agent ─────────────────────────────────────────────── 13 tokens ┐
         │ ╭ User ────────────────────────────────────────────────────────────╮ │
         │ │ hello                                                            │ │
         │ ╰──────────────────────────────────────────────────────────────────╯ │

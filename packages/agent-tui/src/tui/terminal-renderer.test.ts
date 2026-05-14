@@ -77,6 +77,25 @@ describe("TerminalRenderer", () => {
     expect(input.rawModes).toEqual([true, false]);
   });
 
+  it("shows most recent call total tokens in the outer frame", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output });
+
+    await renderer.renderStream(
+      createStream(["hello"], {
+        inputTokens: 3,
+        outputTokens: 12,
+      }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    expect(stripAnsi(output.text())).toContain("┌ Test ───────────────────── 15 tokens ┐");
+  });
+
   it("streams assistant text with token count when configured", async () => {
     const input = createInput();
     const output = createOutput();
@@ -428,7 +447,7 @@ function createOutput() {
 
 function createStream(
   chunks: string[],
-  stats?: { outputTokens: number; tokensPerSecond?: number },
+  stats?: { inputTokens?: number; outputTokens: number; tokensPerSecond?: number },
 ): AgentTUIStreamResult {
   return {
     uiMessageStream: (async function* () {
@@ -440,7 +459,13 @@ function createStream(
       yield { type: "text-end", id: "text-1" };
       yield {
         type: "finish",
-        usage: stats == null ? undefined : { outputTokens: stats.outputTokens },
+        usage:
+          stats == null
+            ? undefined
+            : {
+                ...(stats.inputTokens == null ? {} : { inputTokens: stats.inputTokens }),
+                outputTokens: stats.outputTokens,
+              },
         messageMetadata:
           stats?.tokensPerSecond == null
             ? undefined

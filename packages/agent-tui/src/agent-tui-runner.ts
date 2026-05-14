@@ -11,6 +11,7 @@ import {
   getToolName,
   isToolUIPart,
   type StepResultPerformance,
+  type LanguageModelUsage,
   type TextStreamPart,
   type ToolSet,
   type UIMessage,
@@ -240,6 +241,7 @@ async function* textStreamToUIMessageStream(
   const openTextParts = new Set<string>();
   const openReasoningParts = new Set<string>();
   const openToolCalls = new Set<string>();
+  let latestStepUsage: LanguageModelUsage | undefined;
   let latestPerformance: StepResultPerformance | undefined;
   let sentFinish = false;
 
@@ -444,6 +446,7 @@ async function* textStreamToUIMessageStream(
         yield { type: "start-step" };
         break;
       case "finish-step":
+        latestStepUsage = part.usage;
         latestPerformance = part.performance;
         yield { type: "finish-step" };
         break;
@@ -453,7 +456,10 @@ async function* textStreamToUIMessageStream(
         yield {
           type: "finish",
           finishReason: part.finishReason,
-          messageMetadata: createResponseMetadata(part.totalUsage.outputTokens, latestPerformance),
+          messageMetadata: createResponseMetadata(
+            latestStepUsage ?? part.totalUsage,
+            latestPerformance,
+          ),
         };
         break;
       case "abort":
@@ -472,15 +478,26 @@ async function* textStreamToUIMessageStream(
 }
 
 function createResponseMetadata(
-  outputTokens: number | undefined,
+  usage: LanguageModelUsage | undefined,
   performance?: StepResultPerformance,
 ): ResponseMetadata | undefined {
-  if (outputTokens == null && performance?.tokensPerSecond == null) {
+  if (
+    usage?.totalTokens == null &&
+    usage?.outputTokens == null &&
+    performance?.tokensPerSecond == null
+  ) {
     return undefined;
   }
 
   return {
-    ...(outputTokens == null ? {} : { usage: { outputTokens } }),
+    ...(usage?.totalTokens == null && usage?.outputTokens == null
+      ? {}
+      : {
+          usage: {
+            ...(usage.totalTokens == null ? {} : { totalTokens: usage.totalTokens }),
+            ...(usage.outputTokens == null ? {} : { outputTokens: usage.outputTokens }),
+          },
+        }),
     ...(performance?.tokensPerSecond == null
       ? {}
       : { performance: { tokensPerSecond: performance.tokensPerSecond } }),
@@ -489,7 +506,8 @@ function createResponseMetadata(
 
 type ResponseMetadata = {
   usage?: {
-    outputTokens: number;
+    totalTokens?: number;
+    outputTokens?: number;
   };
   performance?: Pick<StepResultPerformance, "tokensPerSecond">;
 };

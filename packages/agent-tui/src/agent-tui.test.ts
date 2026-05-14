@@ -255,6 +255,32 @@ describe("AgentTUIRunner", () => {
     expect(renderer.assistantResponseStats).toEqual(["tokens"]);
   });
 
+  it("streams total token usage in response metadata", async () => {
+    const streamCalls: AgentTUIStreamCall[] = [];
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["hello", undefined],
+      }),
+    );
+    const agent = createAgent(streamCalls, [
+      { type: "text-start", id: "text-1" },
+      { type: "text-delta", id: "text-1", text: "hello" },
+      { type: "text-end", id: "text-1" },
+      {
+        type: "finish",
+        finishReason: "stop",
+        rawFinishReason: "stop",
+        totalUsage: createUsage({ inputTokens: 3, outputTokens: 12, totalTokens: 15 }),
+      },
+    ]);
+
+    await new AgentTUIRunner({ agent, name: "Test Agent" }).run();
+
+    expect(renderer.responseMessages[0]?.metadata).toEqual({
+      usage: { totalTokens: 15, outputTokens: 12 },
+    });
+  });
+
   it("accepts an injected renderer", async () => {
     const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = createRenderer({
@@ -272,7 +298,10 @@ describe("AgentTUIRunner", () => {
 
 type AgentTUIStreamCall = AgentStreamParameters<never, any, any>;
 
-function createAgent(streamCalls: AgentTUIStreamCall[]): AgentTUIAgent {
+function createAgent(
+  streamCalls: AgentTUIStreamCall[],
+  fullStreamParts?: TextStreamPart<ToolSet>[],
+): AgentTUIAgent {
   return {
     version: "agent-v1",
     id: undefined,
@@ -284,7 +313,7 @@ function createAgent(streamCalls: AgentTUIStreamCall[]): AgentTUIAgent {
       streamCalls.push(options);
 
       return {
-        fullStream: createStream(`response to ${lastUserMessageText(options)}`),
+        fullStream: fullStreamParts ?? createStream(`response to ${lastUserMessageText(options)}`),
       } as any;
     },
   };
@@ -336,6 +365,7 @@ type TestRenderer = AgentTUIRenderer & {
   titles: string[];
   assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]>;
   toolApprovalRequests: AgentTUIToolApprovalRequest[];
+  responseMessages: UIMessage[];
 };
 
 function useRenderer<TRenderer extends AgentTUIRenderer>(renderer: TRenderer): TRenderer {
@@ -361,12 +391,14 @@ function createRenderer(options: {
   const titles: string[] = [];
   const assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]> = [];
   const toolApprovalRequests: AgentTUIToolApprovalRequest[] = [];
+  const responseMessages: UIMessage[] = [];
 
   return {
     submittedPrompts,
     titles,
     assistantResponseStats,
     toolApprovalRequests,
+    responseMessages,
     async readPrompt(sessionOptions) {
       if (sessionOptions?.title) {
         titles.push(sessionOptions.title);
@@ -407,6 +439,10 @@ function createRenderer(options: {
         responseMessage = message;
       }
 
+      if (responseMessage) {
+        responseMessages.push(responseMessage);
+      }
+
       return responseMessage;
     },
   };
@@ -416,6 +452,31 @@ function createStream(text: string): AsyncIterable<TextStreamPart<ToolSet>> {
   return (async function* () {
     yield { type: "text-delta", id: "text-1", text };
   })();
+}
+
+function createUsage({
+  inputTokens,
+  outputTokens,
+  totalTokens,
+}: {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}) {
+  return {
+    inputTokens,
+    inputTokenDetails: {
+      noCacheTokens: inputTokens,
+      cacheReadTokens: undefined,
+      cacheWriteTokens: undefined,
+    },
+    outputTokens,
+    outputTokenDetails: {
+      textTokens: outputTokens,
+      reasoningTokens: undefined,
+    },
+    totalTokens,
+  };
 }
 
 function lastUserMessageText(options: AgentTUIStreamCall) {

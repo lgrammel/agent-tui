@@ -9,6 +9,7 @@ export type TUIScreenState = {
   width: number;
   height: number;
   title: string;
+  rightTitle?: string;
   body: string;
   input: string;
   inputActive: boolean;
@@ -60,7 +61,7 @@ export function renderScreenViewport(state: TUIScreenViewportState): string {
   }
 
   const lines = [
-    topBorder(width, state.title),
+    topBorder(width, state.title, state.rightTitle),
     ...visibleBody.map((line) => boxLine(line, width)),
     bottomBorder(width),
     topBorder(width, state.inputActive ? "Input" : "Status"),
@@ -162,12 +163,15 @@ function findBreakPoint(input: string, width: number): number {
   return indexAtVisibleWidth(input, width);
 }
 
-function topBorder(width: number, title: string): string {
+function topBorder(width: number, title: string, rightTitle?: string): string {
   const contentWidth = Math.max(0, width - 2);
   const label = sliceVisible(` ${title} `, contentWidth);
-  const remaining = Math.max(0, contentWidth - visibleLength(label));
+  const rightLabel = rightTitle
+    ? sliceVisible(` ${rightTitle} `, Math.max(0, contentWidth - visibleLength(label)))
+    : "";
+  const remaining = Math.max(0, contentWidth - visibleLength(label) - visibleLength(rightLabel));
 
-  return `┌${label}${horizontal.repeat(remaining)}┐`;
+  return `┌${label}${horizontal.repeat(remaining)}${rightLabel}┐`;
 }
 
 function bottomBorder(width: number): string {

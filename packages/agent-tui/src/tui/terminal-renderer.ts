@@ -95,6 +95,9 @@ type RenderedSectionCache = {
 };
 
 type StreamUsage = {
+  totalTokens?: number | { total?: number };
+  inputTokens?: number | { total?: number };
+  promptTokens?: number;
   outputTokens?: number | { total?: number };
   completionTokens?: number;
 };
@@ -140,6 +143,7 @@ export class TerminalRenderer {
   #status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
   #isInteractive = false;
   #interrupted = false;
+  #totalTokens?: number;
   #assistantOutputTokens?: number;
   #assistantTokensPerSecond?: number;
   #inputCursorVisible = true;
@@ -222,6 +226,7 @@ export class TerminalRenderer {
     this.#inputActive = false;
     this.#status = "Streaming... ↑/↓ scroll · Ctrl+C quit";
     this.#interrupted = false;
+    this.#totalTokens = undefined;
     this.#assistantOutputTokens = undefined;
     this.#assistantTokensPerSecond = undefined;
     const displayModes = {
@@ -469,6 +474,7 @@ export class TerminalRenderer {
   ) {
     const activeSectionIds = new Set<string>();
     const metadataStats = extractAssistantResponseStatsFromMetadata(message.metadata);
+    this.#totalTokens = metadataStats.totalTokens ?? this.#totalTokens;
     this.#assistantOutputTokens = metadataStats.outputTokens ?? this.#assistantOutputTokens;
     this.#assistantTokensPerSecond =
       metadataStats.tokensPerSecond ?? this.#assistantTokensPerSecond;
@@ -491,6 +497,7 @@ export class TerminalRenderer {
             title: "Assistant",
             rightTitle: formatAssistantResponseStats(
               {
+                totalTokens: this.#totalTokens,
                 outputTokens: this.#assistantOutputTokens,
                 tokensPerSecond: this.#assistantTokensPerSecond,
               },
@@ -574,6 +581,7 @@ export class TerminalRenderer {
 
       if (chunk.type === "finish") {
         const stats = extractAssistantResponseStats(chunk);
+        this.#totalTokens = stats.totalTokens;
         this.#assistantOutputTokens = stats.outputTokens;
         this.#assistantTokensPerSecond = stats.tokensPerSecond;
       }
@@ -600,6 +608,7 @@ export class TerminalRenderer {
       width: this.#width(),
       height: this.#height(),
       title: this.#title,
+      rightTitle: formatTokenCount(this.#totalTokens),
       visibleBodyLines: this.#visibleBodyLines(),
       input: this.#inputText,
       inputActive: this.#inputActive,
@@ -1011,6 +1020,7 @@ function extractAssistantResponseStats(chunk: UIMessageChunk) {
       : undefined;
 
   return {
+    totalTokens: extractTotalTokenCountFromUsage(usage ?? metadataUsage),
     outputTokens: extractOutputTokenCountFromUsage(usage ?? metadataUsage),
     tokensPerSecond: metadataPerformance?.tokensPerSecond,
   };
@@ -1020,9 +1030,45 @@ function extractAssistantResponseStatsFromMetadata(metadata: unknown) {
   const stats = metadata as MessageMetadataWithStats | undefined;
 
   return {
+    totalTokens: extractTotalTokenCountFromUsage(stats?.usage),
     outputTokens: extractOutputTokenCountFromUsage(stats?.usage),
     tokensPerSecond: stats?.performance?.tokensPerSecond,
   };
+}
+
+function extractTotalTokenCountFromUsage(usage: StreamUsage | undefined) {
+  const totalTokens = usage?.totalTokens;
+
+  if (typeof totalTokens === "number") {
+    return totalTokens;
+  }
+
+  if (typeof totalTokens?.total === "number") {
+    return totalTokens.total;
+  }
+
+  const inputTokens = extractInputTokenCountFromUsage(usage);
+  const outputTokens = extractOutputTokenCountFromUsage(usage);
+
+  if (inputTokens != null && outputTokens != null) {
+    return inputTokens + outputTokens;
+  }
+
+  return undefined;
+}
+
+function extractInputTokenCountFromUsage(usage: StreamUsage | undefined) {
+  const inputTokens = usage?.inputTokens;
+
+  if (typeof inputTokens === "number") {
+    return inputTokens;
+  }
+
+  if (typeof inputTokens?.total === "number") {
+    return inputTokens.total;
+  }
+
+  return usage?.promptTokens;
 }
 
 function extractOutputTokenCountFromUsage(usage: StreamUsage | undefined) {
@@ -1049,6 +1095,7 @@ function formatTokenCount(tokens: number | undefined) {
 
 function formatAssistantResponseStats(
   stats: {
+    totalTokens: number | undefined;
     outputTokens: number | undefined;
     tokensPerSecond: number | undefined;
   },
