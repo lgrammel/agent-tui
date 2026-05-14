@@ -1,5 +1,12 @@
 # @lgrammel/agent-tui
 
+## 0.4.2
+
+### Patch Changes
+
+- f0da54f: Show "Processing tool results..." after a tool turn completes and the next step starts.
+- f7b47df: Add auto-collapsed terminal display mode for tools and reasoning parts.
+
 ## 0.4.1
 
 ### Patch Changes
