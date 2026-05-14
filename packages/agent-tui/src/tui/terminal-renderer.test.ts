@@ -161,6 +161,42 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("Streaming...");
   });
 
+  it("shows tool execution and next-step processing statuses before streaming", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const toolFinished = createDeferred<void>();
+    const nextTextStarted = createDeferred<void>();
+    const nextStepRendered = createDeferred<void>();
+    const renderer = new TerminalRenderer({ input, output });
+    const renderPromise = renderer.renderStream(
+      createPausedToolStream({
+        toolFinished: toolFinished.promise,
+        onNextStepStarted: nextStepRendered.resolve,
+        nextTextStarted: nextTextStarted.promise,
+      }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+    const initialChunkCount = output.chunks.length;
+
+    await waitForOutputTextAfter(output, initialChunkCount, "Executing tools...");
+    expect(stripAnsi(output.chunks.slice(initialChunkCount).join(""))).not.toContain(
+      "Streaming...",
+    );
+
+    const beforeToolFinishedChunkCount = output.chunks.length;
+    toolFinished.resolve();
+    await nextStepRendered.promise;
+    await waitForOutputTextAfter(output, beforeToolFinishedChunkCount, "Processing input...");
+
+    const beforeNextTextChunkCount = output.chunks.length;
+    nextTextStarted.resolve();
+    await renderPromise;
+    await waitForOutputTextAfter(output, beforeNextTextChunkCount, "Streaming...");
+  });
+
   it("renders reasoning and tool parts as distinct colored cards", async () => {
     const input = createInput();
     const output = createOutput();
@@ -469,6 +505,20 @@ function createOutput() {
   return output;
 }
 
+async function waitForOutputTextAfter(output: TestOutput, chunkIndex: number, text: string) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const rendered = stripAnsi(output.chunks.slice(chunkIndex).join(""));
+
+    if (rendered.includes(text)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  expect(stripAnsi(output.chunks.slice(chunkIndex).join(""))).toContain(text);
+}
+
 function createStream(
   chunks: string[],
   stats?: { inputTokens?: number; outputTokens: number; tokensPerSecond?: number },
@@ -575,6 +625,41 @@ function createToolApprovalStream(): AgentTUIStreamResult {
         approved: false,
         reason: "Denied by user.",
       } satisfies UIMessageChunk;
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createPausedToolStream({
+  toolFinished,
+  onNextStepStarted,
+  nextTextStarted,
+}: {
+  toolFinished: Promise<void>;
+  onNextStepStarted: () => void;
+  nextTextStarted: Promise<void>;
+}): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield {
+        type: "tool-input-available",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
+      } satisfies UIMessageChunk;
+      await toolFinished;
+      yield {
+        type: "tool-output-available",
+        toolCallId: "call-1",
+        output: { city: "Berlin", weather: "sunny" },
+      } satisfies UIMessageChunk;
+      yield { type: "start-step" };
+      onNextStepStarted();
+      await nextTextStarted;
+      yield { type: "text-start", id: "text-1" };
+      yield { type: "text-delta", id: "text-1", delta: "hello" };
+      yield { type: "text-end", id: "text-1" };
       yield { type: "finish" };
     })(),
   };

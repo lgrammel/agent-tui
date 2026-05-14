@@ -128,6 +128,7 @@ const sectionStyles: Record<ChatSectionKind, { color: string; border: string }> 
 const inputCursorBlinkMs = 500;
 const processingStatus = "Processing input... ↑/↓ scroll · Ctrl+C quit";
 const streamingStatus = "Streaming... ↑/↓ scroll · Ctrl+C quit";
+const executingToolsStatus = "Executing tools... ↑/↓ scroll · Ctrl+C quit";
 
 export class TerminalRenderer {
   readonly #input: TerminalInput;
@@ -577,7 +578,12 @@ export class TerminalRenderer {
     stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
   ): AsyncIterable<UIMessageChunk> {
     for await (const chunk of iterateUIMessageStream(stream)) {
-      if (startsVisibleAssistantStream(chunk) && this.#status !== streamingStatus) {
+      const nextStatus = statusForStreamChunk(chunk);
+
+      if (nextStatus && this.#status !== nextStatus) {
+        this.#status = nextStatus;
+        this.#paint();
+      } else if (startsVisibleAssistantStream(chunk) && this.#status !== streamingStatus) {
         this.#status = streamingStatus;
         this.#paint();
       }
@@ -846,10 +852,22 @@ function startsVisibleAssistantStream(chunk: UIMessageChunk) {
     case "reasoning-delta":
     case "tool-input-start":
     case "tool-input-delta":
-    case "tool-input-available":
       return true;
     default:
       return false;
+  }
+}
+
+function statusForStreamChunk(chunk: UIMessageChunk) {
+  switch (chunk.type) {
+    case "start-step":
+      return processingStatus;
+    case "tool-input-available":
+      return executingToolsStatus;
+    case "tool-approval-response":
+      return chunk.approved ? executingToolsStatus : undefined;
+    default:
+      return undefined;
   }
 }
 
