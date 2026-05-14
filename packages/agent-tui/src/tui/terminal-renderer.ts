@@ -925,6 +925,10 @@ function statusForStreamChunk(
   switch (chunk.type) {
     case "start-step":
       return hasPendingToolResults ? processingToolResultsStatus : processingStatus;
+    case "tool-output-available":
+    case "tool-output-error":
+    case "tool-output-denied":
+      return processingToolResultsStatus;
     case "tool-input-available":
       return executingToolsStatus;
     case "tool-approval-response":

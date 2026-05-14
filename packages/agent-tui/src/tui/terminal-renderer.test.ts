@@ -213,13 +213,13 @@ describe("TerminalRenderer", () => {
 
     const beforeToolFinishedChunkCount = output.chunks.length;
     toolFinished.resolve();
-    await nextStepRendered.promise;
     await waitForOutputTextAfter(
       output,
       beforeToolFinishedChunkCount,
       "Processing tool results...",
     );
 
+    await nextStepRendered.promise;
     const beforeNextTextChunkCount = output.chunks.length;
     nextTextStarted.resolve();
     await renderPromise;
