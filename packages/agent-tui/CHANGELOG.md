@@ -1,5 +1,13 @@
 # @lgrammel/agent-tui
 
+## 0.4.1
+
+### Patch Changes
+
+- 6442142: Show tool execution and next-step processing statuses while agent streams continue.
+
+  Allow configuring the context window size so the terminal UI can show token usage as a percentage.
+
 ## 0.4.0
 
 ### Minor Changes
