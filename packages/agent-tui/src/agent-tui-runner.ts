@@ -1,11 +1,10 @@
-import type { AgentTUIAgent, RunAgentTUIOptions } from "./run-agent-tui";
-import {
-  TerminalRenderer,
-  type AssistantResponseStatsMode,
-  type TerminalInput,
-  type TerminalOutput,
-  type TerminalPartDisplayMode,
-} from "./tui/terminal-renderer";
+import type {
+  AgentTUIAgent,
+  AssistantResponseStatsMode,
+  RunAgentTUIOptions,
+  TerminalPartDisplayMode,
+} from "./run-agent-tui";
+import { TerminalRenderer, type TerminalInput, type TerminalOutput } from "./tui/terminal-renderer";
 import {
   convertToModelMessages,
   getToolName,

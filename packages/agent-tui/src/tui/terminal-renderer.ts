@@ -3,6 +3,7 @@ import type {
   AgentTUIToolApprovalRequest,
   AgentTUIToolApprovalResponse,
 } from "../agent-tui-runner";
+import type { AssistantResponseStatsMode, TerminalPartDisplayMode } from "../run-agent-tui";
 import { renderScreenViewport, sliceVisible, visibleLength } from "./layout";
 import { renderMarkdown } from "./markdown";
 import { TerminalFrameBuffer } from "./terminal-frame-buffer";
@@ -38,8 +39,6 @@ export type TerminalOutput = {
   off(event: "resize", listener: () => void): TerminalOutput;
 };
 
-export type TerminalPartDisplayMode = "full" | "collapsed" | "hidden";
-export type AssistantResponseStatsMode = "tokens" | "tokensPerSecond";
 const defaultAssistantResponseStats: AssistantResponseStatsMode = "tokensPerSecond";
 
 export type TerminalRendererOptions = {
