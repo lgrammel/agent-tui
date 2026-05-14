@@ -4,7 +4,7 @@ import type { Agent } from "ai";
 /**
  * Controls how terminal UI sections for stream parts are displayed.
  */
-export type TerminalPartDisplayMode = "full" | "collapsed" | "hidden";
+export type TerminalPartDisplayMode = "full" | "collapsed" | "auto-collapsed" | "hidden";
 
 /**
  * Controls which usage statistic is shown for assistant responses.

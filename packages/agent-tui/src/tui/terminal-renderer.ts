@@ -530,7 +530,7 @@ export class TerminalRenderer {
             kind: "reasoning",
             title: "Reasoning",
             content,
-            collapsed: displayModes.reasoning === "collapsed",
+            collapsed: shouldCollapsePart(message, index, displayModes.reasoning, displayModes),
           });
           break;
         }
@@ -543,7 +543,10 @@ export class TerminalRenderer {
             activeSectionIds.add(id);
             this.#upsertSection({
               id,
-              ...renderToolInvocation(part, { mode: displayModes.tools }),
+              ...renderToolInvocation(part, {
+                mode: displayModes.tools,
+                collapsed: shouldCollapsePart(message, index, displayModes.tools, displayModes),
+              }),
             });
           }
           break;
@@ -788,7 +791,10 @@ function formatStreamError(error: unknown) {
 
 function renderToolInvocation(
   part: ToolUIPart | DynamicToolUIPart,
-  options: { mode: Exclude<TerminalPartDisplayMode, "hidden"> },
+  options: {
+    mode: Exclude<TerminalPartDisplayMode, "hidden">;
+    collapsed: boolean;
+  },
 ): ChatSection {
   const toolName = getToolName(part);
   const title = `Tool · ${part.title ?? toolName}`;
@@ -796,7 +802,7 @@ function renderToolInvocation(
   const inputText = input === undefined ? "Input: (streaming...)" : `Input:\n${formatValue(input)}`;
   const status = toolStatus(part);
 
-  if (options.mode === "collapsed") {
+  if (options.collapsed) {
     return {
       kind: "tool",
       title,
@@ -856,6 +862,45 @@ function renderToolInvocation(
         rightTitle: status,
         content: `${inputText}\n\nReason: ${part.approval.reason ?? "denied"}`,
       };
+  }
+}
+
+function shouldCollapsePart(
+  message: UIMessage,
+  partIndex: number,
+  mode: TerminalPartDisplayMode,
+  displayModes: {
+    tools: TerminalPartDisplayMode;
+    reasoning: TerminalPartDisplayMode;
+  },
+) {
+  switch (mode) {
+    case "collapsed":
+      return true;
+    case "auto-collapsed":
+      return message.parts
+        .slice(partIndex + 1)
+        .some((part) => isVisibleAssistantPart(part, displayModes));
+    case "full":
+    case "hidden":
+      return false;
+  }
+}
+
+function isVisibleAssistantPart(
+  part: UIMessage["parts"][number],
+  displayModes: {
+    tools: TerminalPartDisplayMode;
+    reasoning: TerminalPartDisplayMode;
+  },
+) {
+  switch (part.type) {
+    case "text":
+      return part.text.trim().length > 0;
+    case "reasoning":
+      return displayModes.reasoning !== "hidden" && part.text.trim().length > 0;
+    default:
+      return isToolUIPart(part) && displayModes.tools !== "hidden";
   }
 }
 

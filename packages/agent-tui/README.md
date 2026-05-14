@@ -74,8 +74,8 @@ Settings:
 
 - `agent`: AI SDK agent to run.
 - `name`: title shown in the terminal UI.
-- `tools`: tool call rendering mode. Use `"full"` to show tool input and output, `"collapsed"` to show only tool cards, or `"hidden"` to omit tool calls. Defaults to `"full"`.
-- `reasoning`: reasoning rendering mode. Use `"full"` to show reasoning, `"collapsed"` to show only reasoning cards, or `"hidden"` to omit reasoning. Defaults to `"full"`.
+- `tools`: tool call rendering mode. Use `"full"` to show tool input and output, `"collapsed"` to show only tool cards, `"auto-collapsed"` to show the latest tool expanded until another part appears, or `"hidden"` to omit tool calls. Defaults to `"full"`.
+- `reasoning`: reasoning rendering mode. Use `"full"` to show reasoning, `"collapsed"` to show only reasoning cards, `"auto-collapsed"` to show the latest reasoning expanded until another part appears, or `"hidden"` to omit reasoning. Defaults to `"full"`.
 - `assistantResponseStats`: assistant response header statistic. Use `"tokensPerSecond"` to show throughput or `"tokens"` to show output token count. Defaults to `"tokensPerSecond"`.
 
 ## Example App

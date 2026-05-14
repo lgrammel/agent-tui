@@ -6,6 +6,7 @@ import {
   type TerminalInput,
   type TerminalOutput,
 } from "./terminal-renderer";
+import type { TerminalFrameBuffer } from "./terminal-frame-buffer";
 import { stripAnsi } from "./layout";
 import type { AgentTUIStreamResult } from "../agent-tui-runner";
 import type { UIMessageChunk } from "ai";
@@ -22,6 +23,11 @@ type TestOutput = TerminalOutput &
     chunks: string[];
     text: () => string;
   };
+
+type TestFrameBuffer = TerminalFrameBuffer & {
+  text: () => string;
+  lastPresentedText: () => string;
+};
 
 describe("parseKey", () => {
   it("decodes terminal control keys", () => {
@@ -296,6 +302,64 @@ describe("TerminalRenderer", () => {
     expect(rendered).not.toContain('"weather": "sunny"');
   });
 
+  it("auto-collapses tool parts after a later visible part is shown", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const frameBuffer = createFrameBuffer();
+    output.rows = 20;
+    const nextTextStarted = createDeferred<void>();
+    const renderer = new TerminalRenderer({
+      tools: "auto-collapsed",
+      input,
+      output,
+      frameBuffer,
+    });
+    const renderPromise = renderer.renderStream(
+      createToolThenTextStream({ nextTextStarted: nextTextStarted.promise }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    await waitForFrameText(frameBuffer, "Output:");
+    expect(stripAnsi(frameBuffer.text())).toContain('"weather": "sunny"');
+
+    nextTextStarted.resolve();
+    await renderPromise;
+
+    const rendered = stripAnsi(frameBuffer.lastPresentedText());
+    expect(rendered).toContain("Tool · weather");
+    expect(rendered).toContain("hello");
+    expect(rendered).not.toContain("Input:");
+    expect(rendered).not.toContain("Output:");
+    expect(rendered).not.toContain('"weather": "sunny"');
+  });
+
+  it("keeps auto-collapsed tool parts expanded when later parts are hidden", async () => {
+    const input = createInput();
+    const output = createOutput();
+    output.rows = 20;
+    const renderer = new TerminalRenderer({
+      tools: "auto-collapsed",
+      reasoning: "hidden",
+      input,
+      output,
+    });
+
+    await renderer.renderStream(createToolThenReasoningStream() as never, {
+      title: "Test",
+      waitForExit: false,
+    });
+
+    const rendered = stripAnsi(output.text());
+    expect(rendered).toContain("Tool · weather");
+    expect(rendered).toContain("Output:");
+    expect(rendered).toContain('"weather": "sunny"');
+    expect(rendered).not.toContain("Reasoning");
+    expect(rendered).not.toContain("thinking");
+  });
+
   it("hides tool parts", async () => {
     const input = createInput();
     const output = createOutput();
@@ -332,6 +396,38 @@ describe("TerminalRenderer", () => {
     expect(rendered).toMatch(/╰·+╯/);
     expect(rendered).not.toContain("thinking");
     expect(rendered).toContain("Tool · weather");
+  });
+
+  it("auto-collapses reasoning parts after a later visible part is shown", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const frameBuffer = createFrameBuffer();
+    output.rows = 20;
+    const nextToolStarted = createDeferred<void>();
+    const renderer = new TerminalRenderer({
+      reasoning: "auto-collapsed",
+      input,
+      output,
+      frameBuffer,
+    });
+    const renderPromise = renderer.renderStream(
+      createReasoningThenToolStream({ nextToolStarted: nextToolStarted.promise }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    await waitForFrameText(frameBuffer, "thinking");
+
+    nextToolStarted.resolve();
+    await renderPromise;
+
+    const rendered = stripAnsi(frameBuffer.lastPresentedText());
+    expect(rendered).toContain("Reasoning");
+    expect(rendered).not.toContain("thinking");
+    expect(rendered).toContain("Tool · weather");
+    expect(rendered).toContain("Input:");
   });
 
   it("hides reasoning parts", async () => {
@@ -528,6 +624,27 @@ function createOutput() {
   return output;
 }
 
+function createFrameBuffer() {
+  let frame = "";
+  let lastPresentedFrame = "";
+
+  return {
+    present(nextFrame: string) {
+      frame = nextFrame;
+      lastPresentedFrame = nextFrame;
+    },
+    reset() {
+      frame = "";
+    },
+    text() {
+      return frame;
+    },
+    lastPresentedText() {
+      return lastPresentedFrame;
+    },
+  } as TestFrameBuffer;
+}
+
 async function waitForOutputTextAfter(output: TestOutput, chunkIndex: number, text: string) {
   for (let attempt = 0; attempt < 20; attempt++) {
     const rendered = stripAnsi(output.chunks.slice(chunkIndex).join(""));
@@ -540,6 +657,20 @@ async function waitForOutputTextAfter(output: TestOutput, chunkIndex: number, te
   }
 
   expect(stripAnsi(output.chunks.slice(chunkIndex).join(""))).toContain(text);
+}
+
+async function waitForFrameText(frameBuffer: TestFrameBuffer, text: string) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const rendered = stripAnsi(frameBuffer.text());
+
+    if (rendered.includes(text)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  expect(stripAnsi(frameBuffer.text())).toContain(text);
 }
 
 function createStream(
@@ -602,6 +733,80 @@ function createMixedStream(): AgentTUIStreamResult {
         type: "tool-output-available",
         toolCallId: "call-1",
         output: { city: "Berlin", weather: "sunny" },
+      } satisfies UIMessageChunk;
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createToolThenTextStream({
+  nextTextStarted,
+}: {
+  nextTextStarted: Promise<void>;
+}): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield {
+        type: "tool-input-available",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
+      } satisfies UIMessageChunk;
+      yield {
+        type: "tool-output-available",
+        toolCallId: "call-1",
+        output: { city: "Berlin", weather: "sunny" },
+      } satisfies UIMessageChunk;
+      await nextTextStarted;
+      yield { type: "text-start", id: "text-1" };
+      yield { type: "text-delta", id: "text-1", delta: "hello" };
+      yield { type: "text-end", id: "text-1" };
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createToolThenReasoningStream(): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield {
+        type: "tool-input-available",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
+      } satisfies UIMessageChunk;
+      yield {
+        type: "tool-output-available",
+        toolCallId: "call-1",
+        output: { city: "Berlin", weather: "sunny" },
+      } satisfies UIMessageChunk;
+      yield { type: "reasoning-start", id: "reasoning-1" };
+      yield { type: "reasoning-delta", id: "reasoning-1", delta: "thinking" };
+      yield { type: "reasoning-end", id: "reasoning-1" };
+      yield { type: "finish" };
+    })(),
+  };
+}
+
+function createReasoningThenToolStream({
+  nextToolStarted,
+}: {
+  nextToolStarted: Promise<void>;
+}): AgentTUIStreamResult {
+  return {
+    uiMessageStream: (async function* () {
+      yield { type: "start", messageId: "message-1" };
+      yield { type: "reasoning-start", id: "reasoning-1" };
+      yield { type: "reasoning-delta", id: "reasoning-1", delta: "thinking" };
+      yield { type: "reasoning-end", id: "reasoning-1" };
+      await nextToolStarted;
+      yield {
+        type: "tool-input-available",
+        toolCallId: "call-1",
+        toolName: "weather",
+        input: { city: "Berlin" },
       } satisfies UIMessageChunk;
       yield { type: "finish" };
     })(),
