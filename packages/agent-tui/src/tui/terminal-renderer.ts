@@ -129,6 +129,7 @@ const sectionStyles: Record<ChatSectionKind, { color: string; border: string }> 
 
 const inputCursorBlinkMs = 500;
 const processingStatus = "Processing input... ↑/↓ scroll · Ctrl+C quit";
+const processingToolResultsStatus = "Processing tool results... ↑/↓ scroll · Ctrl+C quit";
 const streamingStatus = "Streaming... ↑/↓ scroll · Ctrl+C quit";
 const executingToolsStatus = "Executing tools... ↑/↓ scroll · Ctrl+C quit";
 
@@ -584,8 +585,16 @@ export class TerminalRenderer {
   async *#observeUIMessageStream(
     stream: AsyncIterable<UIMessageChunk> | ReadableStream<UIMessageChunk>,
   ): AsyncIterable<UIMessageChunk> {
+    let hasPendingToolResults = false;
+
     for await (const chunk of iterateUIMessageStream(stream)) {
-      const nextStatus = statusForStreamChunk(chunk);
+      const nextStatus = statusForStreamChunk(chunk, { hasPendingToolResults });
+
+      if (chunk.type === "start-step") {
+        hasPendingToolResults = false;
+      } else if (finishesToolExecution(chunk)) {
+        hasPendingToolResults = true;
+      }
 
       if (nextStatus && this.#status !== nextStatus) {
         this.#status = nextStatus;
@@ -865,16 +874,30 @@ function startsVisibleAssistantStream(chunk: UIMessageChunk) {
   }
 }
 
-function statusForStreamChunk(chunk: UIMessageChunk) {
+function statusForStreamChunk(
+  chunk: UIMessageChunk,
+  { hasPendingToolResults }: { hasPendingToolResults: boolean },
+) {
   switch (chunk.type) {
     case "start-step":
-      return processingStatus;
+      return hasPendingToolResults ? processingToolResultsStatus : processingStatus;
     case "tool-input-available":
       return executingToolsStatus;
     case "tool-approval-response":
       return chunk.approved ? executingToolsStatus : undefined;
     default:
       return undefined;
+  }
+}
+
+function finishesToolExecution(chunk: UIMessageChunk) {
+  switch (chunk.type) {
+    case "tool-output-available":
+    case "tool-output-error":
+    case "tool-output-denied":
+      return true;
+    default:
+      return false;
   }
 }
 

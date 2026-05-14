@@ -180,7 +180,7 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("Streaming...");
   });
 
-  it("shows tool execution and next-step processing statuses before streaming", async () => {
+  it("shows tool execution and tool-result processing statuses before streaming", async () => {
     const input = createInput();
     const output = createOutput();
     const toolFinished = createDeferred<void>();
@@ -208,7 +208,11 @@ describe("TerminalRenderer", () => {
     const beforeToolFinishedChunkCount = output.chunks.length;
     toolFinished.resolve();
     await nextStepRendered.promise;
-    await waitForOutputTextAfter(output, beforeToolFinishedChunkCount, "Processing input...");
+    await waitForOutputTextAfter(
+      output,
+      beforeToolFinishedChunkCount,
+      "Processing tool results...",
+    );
 
     const beforeNextTextChunkCount = output.chunks.length;
     nextTextStarted.resolve();
