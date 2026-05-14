@@ -1,5 +1,12 @@
 # @lgrammel/agent-tui
 
+## 0.4.3
+
+### Patch Changes
+
+- 95f9eb8: Show tool-result processing status immediately after tool execution finishes.
+- 12db3db: Preserve manual scroll position while new terminal output streams.
+
 ## 0.4.2
 
 ### Patch Changes
