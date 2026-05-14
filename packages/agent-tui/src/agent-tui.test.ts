@@ -90,6 +90,30 @@ describe("runAgentTUI", () => {
       { assistantResponseStats: "tokensPerSecond", reasoning: undefined, tools: undefined },
     ]);
   });
+
+  it("passes context size to the default terminal renderer", async () => {
+    useRenderer(
+      createRenderer({
+        prompts: [undefined],
+      }),
+    );
+    const agent = createAISDKAgent();
+
+    await runAgentTUI({
+      agent,
+      name: "Test Agent",
+      contextSize: 200_000,
+    });
+
+    expect(terminalRendererOptions).toEqual([
+      {
+        assistantResponseStats: undefined,
+        contextSize: 200_000,
+        reasoning: undefined,
+        tools: undefined,
+      },
+    ]);
+  });
 });
 
 describe("AgentTUIRunner", () => {
@@ -255,6 +279,24 @@ describe("AgentTUIRunner", () => {
     expect(renderer.assistantResponseStats).toEqual(["tokens"]);
   });
 
+  it("passes context size to stream rendering", async () => {
+    const streamCalls: AgentTUIStreamCall[] = [];
+    const renderer = useRenderer(
+      createRenderer({
+        prompts: ["hello", undefined],
+      }),
+    );
+    const agent = createAgent(streamCalls);
+
+    await new AgentTUIRunner({
+      agent,
+      name: "Test Agent",
+      contextSize: 200_000,
+    }).run();
+
+    expect(renderer.contextSizes).toEqual([200_000]);
+  });
+
   it("streams total token usage in response metadata", async () => {
     const streamCalls: AgentTUIStreamCall[] = [];
     const renderer = useRenderer(
@@ -364,6 +406,7 @@ type TestRenderer = AgentTUIRenderer & {
   submittedPrompts: string[];
   titles: string[];
   assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]>;
+  contextSizes: Array<AgentTUISessionOptions["contextSize"]>;
   toolApprovalRequests: AgentTUIToolApprovalRequest[];
   responseMessages: UIMessage[];
 };
@@ -390,6 +433,7 @@ function createRenderer(options: {
   const submittedPrompts: string[] = [];
   const titles: string[] = [];
   const assistantResponseStats: Array<AgentTUISessionOptions["assistantResponseStats"]> = [];
+  const contextSizes: Array<AgentTUISessionOptions["contextSize"]> = [];
   const toolApprovalRequests: AgentTUIToolApprovalRequest[] = [];
   const responseMessages: UIMessage[] = [];
 
@@ -397,6 +441,7 @@ function createRenderer(options: {
     submittedPrompts,
     titles,
     assistantResponseStats,
+    contextSizes,
     toolApprovalRequests,
     responseMessages,
     async readPrompt(sessionOptions) {
@@ -430,6 +475,7 @@ function createRenderer(options: {
       }
 
       assistantResponseStats.push(sessionOptions?.assistantResponseStats);
+      contextSizes.push(sessionOptions?.contextSize);
 
       let responseMessage: UIMessage | undefined;
 

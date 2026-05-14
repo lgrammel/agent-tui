@@ -39,6 +39,7 @@ export type AgentTUISessionOptions = {
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
   assistantResponseStats?: AssistantResponseStatsMode;
+  contextSize?: number;
 };
 
 export type AgentTUIToolApprovalRequest = {
@@ -86,6 +87,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   readonly #tools: TerminalPartDisplayMode;
   readonly #reasoning: TerminalPartDisplayMode;
   readonly #assistantResponseStats: AssistantResponseStatsMode;
+  readonly #contextSize?: number;
 
   constructor(options: AgentTUIRunnerOptions<TAgent>) {
     this.#agent = options.agent;
@@ -94,6 +96,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
     this.#tools = options.tools ?? "full";
     this.#reasoning = options.reasoning ?? "full";
     this.#assistantResponseStats = options.assistantResponseStats ?? defaultAssistantResponseStats;
+    this.#contextSize = options.contextSize;
   }
 
   async run() {
@@ -147,6 +150,7 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
           tools: this.#tools,
           reasoning: this.#reasoning,
           assistantResponseStats: this.#assistantResponseStats,
+          contextSize: this.#contextSize,
           waitForExit: false,
         });
 
@@ -206,12 +210,14 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
 function createDefaultRenderer(options: AgentTUIRunnerOptions) {
   return options.tools === undefined &&
     options.reasoning === undefined &&
-    options.assistantResponseStats === undefined
+    options.assistantResponseStats === undefined &&
+    options.contextSize === undefined
     ? new TerminalRenderer()
     : new TerminalRenderer({
         tools: options.tools,
         reasoning: options.reasoning,
         assistantResponseStats: options.assistantResponseStats,
+        contextSize: options.contextSize,
       });
 }
 
@@ -228,6 +234,7 @@ function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | unde
     tools: options.tools,
     reasoning: options.reasoning,
     assistantResponseStats: options.assistantResponseStats,
+    contextSize: options.contextSize,
     input: options.userInput,
     output: options.screen,
   });

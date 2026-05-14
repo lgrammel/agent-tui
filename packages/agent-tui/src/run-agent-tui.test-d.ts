@@ -48,6 +48,16 @@ describe("runAgentTUI types", () => {
     >();
   });
 
+  it("accepts a context size option", () => {
+    const agent = new ToolLoopAgent({
+      model,
+    });
+
+    expectTypeOf(runAgentTUI({ name: "Context Agent", agent, contextSize: 200_000 })).toEqualTypeOf<
+      Promise<void>
+    >();
+  });
+
   it("rejects a ToolLoopAgent with optional call options", () => {
     const agent = new ToolLoopAgent<{ temperature?: number }>({
       model,

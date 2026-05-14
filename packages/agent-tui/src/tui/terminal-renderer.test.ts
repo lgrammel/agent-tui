@@ -96,6 +96,25 @@ describe("TerminalRenderer", () => {
     expect(stripAnsi(output.text())).toContain("┌ Test ───────────────────── 15 tokens ┐");
   });
 
+  it("shows context window percentage with total tokens in the outer frame", async () => {
+    const input = createInput();
+    const output = createOutput();
+    const renderer = new TerminalRenderer({ input, output, contextSize: 60 });
+
+    await renderer.renderStream(
+      createStream(["hello"], {
+        inputTokens: 3,
+        outputTokens: 12,
+      }) as never,
+      {
+        title: "Test",
+        waitForExit: false,
+      },
+    );
+
+    expect(stripAnsi(output.text())).toContain("┌ Test ───────────────── 15 tokens 25% ┐");
+  });
+
   it("streams assistant text with token count when configured", async () => {
     const input = createInput();
     const output = createOutput();

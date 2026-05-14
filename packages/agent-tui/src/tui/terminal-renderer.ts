@@ -49,6 +49,7 @@ export type TerminalRendererOptions = {
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
   assistantResponseStats?: AssistantResponseStatsMode;
+  contextSize?: number;
 };
 
 export type TerminalSessionOptions = {
@@ -60,6 +61,7 @@ export type TerminalSessionOptions = {
   tools?: TerminalPartDisplayMode;
   reasoning?: TerminalPartDisplayMode;
   assistantResponseStats?: AssistantResponseStatsMode;
+  contextSize?: number;
 };
 
 export type TerminalKey =
@@ -137,6 +139,7 @@ export class TerminalRenderer {
   readonly #tools: TerminalPartDisplayMode;
   readonly #reasoning: TerminalPartDisplayMode;
   readonly #assistantResponseStats: AssistantResponseStatsMode;
+  readonly #defaultContextSize?: number;
 
   #sections: ChatSection[] = [];
   #inputText = "";
@@ -147,6 +150,7 @@ export class TerminalRenderer {
   #isInteractive = false;
   #interrupted = false;
   #totalTokens?: number;
+  #contextSize?: number;
   #assistantOutputTokens?: number;
   #assistantTokensPerSecond?: number;
   #inputCursorVisible = true;
@@ -162,6 +166,8 @@ export class TerminalRenderer {
     this.#tools = options?.tools ?? "full";
     this.#reasoning = options?.reasoning ?? "full";
     this.#assistantResponseStats = options?.assistantResponseStats ?? defaultAssistantResponseStats;
+    this.#defaultContextSize = options?.contextSize;
+    this.#contextSize = options?.contextSize;
   }
 
   async readPrompt(options?: TerminalSessionOptions): Promise<string> {
@@ -345,6 +351,7 @@ export class TerminalRenderer {
 
   #start(options?: TerminalSessionOptions) {
     this.#title = options?.title ?? this.#title;
+    this.#contextSize = options?.contextSize ?? this.#defaultContextSize;
 
     if (this.#isInteractive) {
       return;
@@ -621,7 +628,7 @@ export class TerminalRenderer {
       width: this.#width(),
       height: this.#height(),
       title: this.#title,
-      rightTitle: formatTokenCount(this.#totalTokens),
+      rightTitle: formatTokenCount(this.#totalTokens, this.#contextSize),
       visibleBodyLines: this.#visibleBodyLines(),
       input: this.#inputText,
       inputActive: this.#inputActive,
@@ -1125,12 +1132,23 @@ function extractOutputTokenCountFromUsage(usage: StreamUsage | undefined) {
   return usage?.completionTokens;
 }
 
-function formatTokenCount(tokens: number | undefined) {
+function formatTokenCount(tokens: number | undefined, contextSize?: number) {
   if (tokens == null) {
     return undefined;
   }
 
-  return `${tokens.toLocaleString()} ${tokens === 1 ? "token" : "tokens"}`;
+  const tokenCount = `${tokens.toLocaleString()} ${tokens === 1 ? "token" : "tokens"}`;
+  const contextPercentage = formatContextPercentage(tokens, contextSize);
+
+  return contextPercentage == null ? tokenCount : `${tokenCount} ${contextPercentage}`;
+}
+
+function formatContextPercentage(tokens: number, contextSize: number | undefined) {
+  if (contextSize == null || contextSize <= 0 || !Number.isFinite(contextSize)) {
+    return undefined;
+  }
+
+  return `${Math.round((tokens / contextSize) * 100).toLocaleString()}%`;
 }
 
 function formatAssistantResponseStats(

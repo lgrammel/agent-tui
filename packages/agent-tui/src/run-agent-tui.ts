@@ -39,6 +39,14 @@ export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
    * @default "tokensPerSecond"
    */
   assistantResponseStats?: AssistantResponseStatsMode;
+
+  /**
+   * The model context window size in tokens.
+   *
+   * When provided, the terminal UI shows the current total token usage as a
+   * percentage of this context window.
+   */
+  contextSize?: number;
 };
 
 /**
