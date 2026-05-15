@@ -213,11 +213,11 @@ function createDefaultRenderer(options: AgentTUIRunnerOptions) {
     options.contextSize === undefined
     ? new TerminalRenderer()
     : new TerminalRenderer({
-      tools: options.tools,
-      reasoning: options.reasoning,
-      assistantResponseStats: options.assistantResponseStats,
-      contextSize: options.contextSize,
-    });
+        tools: options.tools,
+        reasoning: options.reasoning,
+        assistantResponseStats: options.assistantResponseStats,
+        contextSize: options.contextSize,
+      });
 }
 
 function createRenderer(options: AgentTUIRunnerOptions): AgentTUIRenderer | undefined {
@@ -499,11 +499,11 @@ function createResponseMetadata(
     ...(usage?.totalTokens == null && usage?.outputTokens == null
       ? {}
       : {
-        usage: {
-          ...(usage.totalTokens == null ? {} : { totalTokens: usage.totalTokens }),
-          ...(usage.outputTokens == null ? {} : { outputTokens: usage.outputTokens }),
-        },
-      }),
+          usage: {
+            ...(usage.totalTokens == null ? {} : { totalTokens: usage.totalTokens }),
+            ...(usage.outputTokens == null ? {} : { outputTokens: usage.outputTokens }),
+          },
+        }),
     ...(performance?.outputTokensPerSecond == null
       ? {}
       : { performance: { outputTokensPerSecond: performance.outputTokensPerSecond } }),

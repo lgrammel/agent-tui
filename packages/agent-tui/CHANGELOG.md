@@ -1,5 +1,11 @@
 # @lgrammel/agent-tui
 
+## 0.4.5
+
+### Patch Changes
+
+- de0e0f0: Update AI SDK compatibility for response performance metadata.
+
 ## 0.4.4
 
 ### Patch Changes
