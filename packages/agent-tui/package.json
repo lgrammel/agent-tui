@@ -54,10 +54,11 @@
     "release:dry-run": "bun run pack:dry-run",
     "release": "npm publish"
   },
-  "dependencies": {
+  "devDependencies": {
     "ai": "7.0.0-canary.134"
   },
   "peerDependencies": {
+    "ai": "7.0.0-canary.134",
     "typescript": "^5 || ^6"
   }
 }

@@ -10,9 +10,9 @@ tool cards, approvals, markdown rendering, scrollback, and a pinned prompt.
 ## Install
 
 ```bash
-npm install @lgrammel/agent-tui
-pnpm add @lgrammel/agent-tui
-bun add @lgrammel/agent-tui
+npm install @lgrammel/agent-tui ai
+pnpm add @lgrammel/agent-tui ai
+bun add @lgrammel/agent-tui ai
 ```
 
 ## Usage

@@ -70,7 +70,7 @@ export type AgentTUIRenderer = {
 };
 
 export type AgentTUIRunnerOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = Omit<
-  RunAgentTUIOptions<AgentTUIAgent>,
+  RunAgentTUIOptions,
   "agent"
 > & {
   agent: TAgent;

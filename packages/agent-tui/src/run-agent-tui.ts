@@ -21,11 +21,11 @@ export type AgentTUIAgent = Agent<never, any, any, never>;
 /**
  * Options for starting an agent in the default terminal UI.
  */
-export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
+export type RunAgentTUIOptions = {
   /**
    * The agent to run.
    */
-  agent: TAgent;
+  agent: AgentTUIAgent;
 
   /**
    * The title shown in the terminal UI.
@@ -61,8 +61,6 @@ export type RunAgentTUIOptions<TAgent extends AgentTUIAgent = AgentTUIAgent> = {
 /**
  * Runs an agent in the default terminal UI until the user exits.
  */
-export async function runAgentTUI<TAgent extends AgentTUIAgent = AgentTUIAgent>(
-  options: RunAgentTUIOptions<TAgent>,
-) {
+export async function runAgentTUI(options: RunAgentTUIOptions) {
   await new AgentTUIRunner(options).run();
 }

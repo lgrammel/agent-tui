@@ -26,10 +26,11 @@
     "packages/agent-tui": {
       "name": "@lgrammel/agent-tui",
       "version": "0.4.3",
-      "dependencies": {
+      "devDependencies": {
         "ai": "7.0.0-canary.134",
       },
       "peerDependencies": {
+        "ai": "7.0.0-canary.134",
         "typescript": "^5 || ^6",
       },
     },
