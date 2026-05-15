@@ -1,5 +1,11 @@
 # @lgrammel/agent-tui
 
+## 0.4.4
+
+### Patch Changes
+
+- dd23c1a: Move `ai` to a peer dependency so consumers use a single AI SDK type instance.
+
 ## 0.4.3
 
 ### Patch Changes

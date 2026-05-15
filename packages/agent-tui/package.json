@@ -1,6 +1,6 @@
 {
   "name": "@lgrammel/agent-tui",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Run AI SDK agents in a terminal UI.",
   "keywords": [
     "agent",
