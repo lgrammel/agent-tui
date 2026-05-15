@@ -105,7 +105,7 @@ type StreamUsage = {
 
 type MessageMetadataWithStats = {
   usage?: StreamUsage;
-  performance?: Pick<StepResultPerformance, "tokensPerSecond">;
+  performance?: Pick<StepResultPerformance, "outputTokensPerSecond">;
 };
 
 const colors = {
@@ -1144,7 +1144,7 @@ function extractAssistantResponseStats(chunk: UIMessageChunk) {
   return {
     totalTokens: extractTotalTokenCountFromUsage(usage ?? metadataUsage),
     outputTokens: extractOutputTokenCountFromUsage(usage ?? metadataUsage),
-    tokensPerSecond: metadataPerformance?.tokensPerSecond,
+    tokensPerSecond: metadataPerformance?.outputTokensPerSecond,
   };
 }
 
@@ -1154,7 +1154,7 @@ function extractAssistantResponseStatsFromMetadata(metadata: unknown) {
   return {
     totalTokens: extractTotalTokenCountFromUsage(stats?.usage),
     outputTokens: extractOutputTokenCountFromUsage(stats?.usage),
-    tokensPerSecond: stats?.performance?.tokensPerSecond,
+    tokensPerSecond: stats?.performance?.outputTokensPerSecond,
   };
 }
 

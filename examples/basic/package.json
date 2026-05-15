@@ -9,7 +9,7 @@
   "dependencies": {
     "@ai-sdk/openai": "4.0.0-canary.55",
     "@lgrammel/agent-tui": "workspace:*",
-    "ai": "7.0.0-canary.134",
+    "ai": "7.0.0-canary.139",
     "zod": "^4"
   }
 }

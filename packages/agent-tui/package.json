@@ -55,10 +55,10 @@
     "release": "npm publish"
   },
   "devDependencies": {
-    "ai": "7.0.0-canary.134"
+    "ai": "7.0.0-canary.139"
   },
   "peerDependencies": {
-    "ai": "7.0.0-canary.134",
+    "ai": "7.0.0-canary.139",
     "typescript": "^5 || ^6"
   }
 }
