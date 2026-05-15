@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "demo": "bun --env-file=.env run demo.ts",
     "weather": "bun --env-file=.env run index.ts"
   },
   "dependencies": {
