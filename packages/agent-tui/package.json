@@ -58,6 +58,6 @@
     "ai": "7.0.0-canary.134"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5 || ^6"
   }
 }

@@ -1,8 +1,9 @@
-import { runAgentTUI, type AgentTUIAgent } from "./run-agent-tui";
+import { runAgentTUI } from "@lgrammel/agent-tui";
 import { MockLanguageModelV4 } from "ai/test";
 import { ToolLoopAgent, tool } from "ai";
 import { assertType, describe, expectTypeOf, it } from "vitest";
 import { z } from "zod";
+import type { AgentTUIAgent } from "./run-agent-tui";
 
 const model = new MockLanguageModelV4({
   doStream: async () => ({
@@ -56,6 +57,22 @@ describe("runAgentTUI types", () => {
     expectTypeOf(runAgentTUI({ name: "Context Agent", agent, contextSize: 200_000 })).toEqualTypeOf<
       Promise<void>
     >();
+  });
+
+  it("accepts a ToolLoopAgent with terminal display options", () => {
+    expectTypeOf(
+      runAgentTUI({
+        name: "Demo Agent",
+        agent: new ToolLoopAgent({
+          model,
+          instructions:
+            "You are a concise terminal assistant. Answer in markdown and ask a brief clarifying question when the request is ambiguous.",
+        }),
+        tools: "collapsed",
+        reasoning: "collapsed",
+        assistantResponseStats: "tokensPerSecond",
+      }),
+    ).toEqualTypeOf<Promise<void>>();
   });
 
   it("rejects a ToolLoopAgent with optional call options", () => {
