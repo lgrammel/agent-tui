@@ -194,12 +194,17 @@ export class AgentTUIRunner<TAgent extends AgentTUIAgent = AgentTUIAgent> {
   ): Promise<AgentTUIStreamResult> {
     const abortController = new AbortController();
     const result = await this.#agent.stream({
-      prompt: await convertToModelMessages(messages, { tools: this.#agent.tools }),
+      prompt: await convertToModelMessages(messages, { tools: this.#agent.tools as ToolSet }),
       abortSignal: abortController.signal,
+      options: undefined,
     });
 
     return {
-      uiMessageStream: textStreamToUIMessageStream(result.fullStream, generateMessageId, messages),
+      uiMessageStream: textStreamToUIMessageStream(
+        result.fullStream as AsyncIterable<TextStreamPart<ToolSet>>,
+        generateMessageId,
+        messages,
+      ),
       message: lastAssistantMessage(messages),
       abort: () => abortController.abort(),
     };

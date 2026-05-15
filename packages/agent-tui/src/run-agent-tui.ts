@@ -16,7 +16,7 @@ export type AssistantResponseStatsMode = "tokens" | "tokensPerSecond";
  *
  * It has no call options and no structured output.
  */
-export type AgentTUIAgent = Agent<never, any, any, never>;
+export type AgentTUIAgent = Agent<undefined, any, any, never>;
 
 /**
  * Options for starting an agent in the default terminal UI.

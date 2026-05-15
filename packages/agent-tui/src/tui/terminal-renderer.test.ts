@@ -777,7 +777,7 @@ function createStream(
         messageMetadata:
           stats?.tokensPerSecond == null
             ? undefined
-            : { performance: { tokensPerSecond: stats.tokensPerSecond } },
+            : { performance: { outputTokensPerSecond: stats.tokensPerSecond } },
       };
     })(),
   };
