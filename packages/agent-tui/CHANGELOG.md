@@ -1,5 +1,11 @@
 # @lgrammel/agent-tui
 
+## 0.4.6
+
+### Patch Changes
+
+- 055e2f4: Fix terminal UI agent typing for agents created with separate AI SDK installs.
+
 ## 0.4.5
 
 ### Patch Changes
